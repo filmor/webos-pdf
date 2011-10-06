@@ -1,0 +1,1 @@
+arm_gcc -I /usr/arm-none-linux-gnueabi/usr/local/include/glib-2.0 -I /usr/arm-none-linux-gnueabi/usr/local/lib/glib-2.0/include -I /usr/arm-none-linux-gnueabi/usr/local/include/cairo/ -I /opt/PalmPDK/include -I /opt/PalmPDK/include/SDL -L/opt/PalmPDK/device/lib -lpoppler -lpoppler-glib -lpdl -lSDL -lcairo -lgcc simple_pdf.c
