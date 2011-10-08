@@ -3,15 +3,21 @@
 
 #include <string>
 #include <stdexcept>
+#include <vector>
 
-#include "mupdf/mupdf.h"
-#include "fitz/fitz.h"
+extern "C"
+{
+#include <fitz.h>
+#include <mupdf.h>
+}
 
 namespace viewer
 {
 
-    class pdf_exception : public runtime_error
+    struct pdf_exception : std::runtime_error
     {
+        pdf_exception(const char* message) : std::runtime_error(message)
+        {}
     };
 
     class pdf_page;
@@ -25,11 +31,15 @@ namespace viewer
         pdf_document(std::string const& filename,
                      std::string const& password = "")
             ;
+        ~pdf_document();
+
+        pdf_page& operator[] (std::size_t index);
 
         std::size_t pages() const;
 
     private:
         pdf_xref* xref_;
+        std::vector<pdf_page*> pages_;
     };
 
     class pdf_page
@@ -38,12 +48,24 @@ namespace viewer
         pdf_page(pdf_document& doc, std::size_t n);
         ~pdf_page();
 
+        std::size_t height() const;
+        fz_bbox get_bbox(fz_matrix const& matrix) const;
+        int rotate() const { return page_->rotate; }
+
+        void run(fz_device* device, fz_matrix const& matrix,
+                 fz_bbox const& bbox) const;
+
+        void run(fz_device* device, fz_matrix const& matrix) const
+        {
+            run(device, matrix, get_bbox(matrix));
+        }
+
+
     private:
         pdf_document& doc_;
-        pdf_page* page_;
+        ::pdf_page* page_;
         fz_display_list* list_;
         fz_text_span* text_span_;
-        std::string text_:
     };
 
 }
