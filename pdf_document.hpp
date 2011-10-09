@@ -49,6 +49,7 @@ namespace viewer
         ~pdf_page();
 
         std::size_t height() const;
+        std::size_t width() const;
         fz_bbox get_bbox(fz_matrix const& matrix) const;
         int rotate() const { return page_->rotate; }
 

@@ -1,7 +1,11 @@
 #include <pthread.h>
+#include <syslog.h>
+
 #include <PDL.h>
 #include <SDL.h>
+
 #include <boost/format.hpp>
+
 #include "pdf_document.hpp"
 #include "png_renderer.hpp"
 
@@ -9,7 +13,7 @@ pthread_mutex_t mutex;
 viewer::pdf_document* document = 0;
 
 // <path><prefix><page>-<zoom><suffix>
-const boost::format format ("%1$s%2$s%4$04d-%3$03d%s");
+const boost::format format ("%1$s%2$s%5$04d-%3$03d%4$s");
 
 namespace service
 {
@@ -19,19 +23,36 @@ PDL_bool do_shell(PDL_JSParameters* params)
     return PDL_TRUE;
 }
 
+const boost::format response ("{\"pages\":%d,\"width\":%d,\"height\":%d}");
+const boost::format error ("{\"error\":\"%s\"");
+
 PDL_bool do_open(PDL_JSParameters* params)
 {
+    std::string r = "";
     pthread_mutex_lock(&mutex);
     try
     {
         document = new viewer::pdf_document(PDL_GetJSParamString(params, 1));
-        PDL_CallJS("OpenCallback", 0, 0);
+        r = (boost::format(response) % document->pages()
+                                    % (*document)[0].width()
+                                    % (*document)[0].height()).str();
     }
-    catch (viewer::pdf_exception const&)
+    catch (viewer::pdf_exception const& exc)
     {
-        return PDL_FALSE;
+        r = (boost::format(error) % exc.what()).str();
     }
-    pthread_mutex_unlock(&mutex);
+
+    const char* ptr = r.c_str();
+
+    PDL_CallJS("OpenCallback", &ptr, 1);
+
+    // {
+    //  error : "String" if failed,
+    //  pages : document.pages(),
+    //  width : document[0].width(),
+    //  height : document[0].height,
+    // }
+
     return PDL_TRUE;
 }
 
@@ -152,21 +173,32 @@ const char* version_information = "mupdf 0.9";
 
 int main()
 {
-    PDL_Init(0);
+    syslog(LOG_WARNING, "Starting up");
     SDL_Init(SDL_INIT_VIDEO);
+    PDL_Init(0);
 
     pthread_mutex_init(&mutex, 0);
 
     PDL_RegisterJSHandler("Handler", &handler);
     PDL_JSRegistrationComplete();
 
+    PDL_CallJS("ready", 0, 0);
     PDL_CallJS("VersionCallback", &version_information, 1);
+
+    syslog(LOG_WARNING, "Hello world! :)");
+
+    SDL_Event event;
+    do
+    {
+        SDL_WaitEvent(&event);
+    }
+    while (event.type != SDL_QUIT);
 
     pthread_mutex_destroy(&mutex);
 
     if (document)
         delete document;
 
-    SDL_Quit();
     PDL_Quit();
+    SDL_Quit();
 }

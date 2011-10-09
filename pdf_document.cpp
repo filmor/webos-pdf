@@ -1,5 +1,7 @@
 #include "pdf_document.hpp"
 
+#include <cmath>
+
 #define PDF_TRY(expr, error_message)            \
     {                                           \
         int error = (expr);                     \
@@ -79,7 +81,12 @@ namespace viewer
 
     std::size_t pdf_page::height() const
     {
-        return page_->mediabox.y1;
+        return std::abs(page_->mediabox.y1 - page_->mediabox.y0);
+    }
+
+    std::size_t pdf_page::width() const
+    {
+        return std::abs(page_->mediabox.x1 - page_->mediabox.x0);
     }
 
     pdf_page::~pdf_page()
