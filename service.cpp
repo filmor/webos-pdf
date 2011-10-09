@@ -1,9 +1,15 @@
 #include <pthread.h>
+#include <PDL.h>
+#include <SDL.h>
+#include <boost/format.hpp>
 #include "pdf_document.hpp"
 #include "png_renderer.hpp"
 
 pthread_mutex_t mutex;
 viewer::pdf_document* document = 0;
+
+// <path><prefix><page>-<zoom><suffix>
+const boost::format format ("%1$s%2$s%4$04d-%3$03d%s");
 
 namespace service
 {
@@ -18,8 +24,8 @@ PDL_bool do_open(PDL_JSParameters* params)
     pthread_mutex_lock(&mutex);
     try
     {
-        document = new viewer::pdf_document(JS_GetStringParam(params, 1));
-        JS_Call("OpenCallback", 0, 0);
+        document = new viewer::pdf_document(PDL_GetJSParamString(params, 1));
+        PDL_CallJS("OpenCallback", 0, 0);
     }
     catch (viewer::pdf_exception const&)
     {
@@ -32,7 +38,7 @@ PDL_bool do_open(PDL_JSParameters* params)
 PDL_bool do_cover(PDL_JSParameters* params)
 {
     // STUB!
-    return ;
+    return PDL_TRUE;
 }
 
 PDL_bool do_toc(PDL_JSParameters* params)
@@ -45,14 +51,18 @@ PDL_bool do_render(PDL_JSParameters* params)
 {
     PDL_bool return_value = PDL_TRUE;
 
-    pdf_renderer renderer;
+    viewer::png_renderer renderer;
 
-    int from = JS_GetParamInt(params, 1);
-    int count = JS_GetParamInt(params, 2);
-    float zoom = JS_GetParamFloat(params, 3);
-    std::string directory = JS_GetParamString(params, 4);
-    std::string prefix = JS_GetParamString(params, 5);
-    std::string suffix = JS_GetParamString(params, 6);
+    boost::format my_formatter(format);
+
+    int from = PDL_GetJSParamInt(params, 1);
+    int count = PDL_GetJSParamInt(params, 2);
+    int zoom = PDL_GetJSParamInt(params, 3);
+    std::string directory = PDL_GetJSParamString(params, 4);
+    std::string prefix = PDL_GetJSParamString(params, 5);
+    std::string suffix = PDL_GetJSParamString(params, 6);
+
+    my_formatter % directory % prefix % zoom % suffix;
 
     pthread_mutex_lock(&mutex);
     try
@@ -62,9 +72,11 @@ PDL_bool do_render(PDL_JSParameters* params)
 
         for (int i = from; i < from + count; ++i)
         {
-            viewer::pdf_page& page = *document[i];
-            std::string filename =
-            renderer.render_full(
+            viewer::pdf_page& page = (*document)[i];
+            renderer.render_full(zoom / 100., page,
+                                 (boost::format(my_formatter) % i).str()
+                                );
+        }
     }
     catch (...)
     {
@@ -104,7 +116,7 @@ PDL_bool handler(PDL_JSParameters* params)
 #define IF_TYPE(name, n)                                        \
     if (type == #name)                                          \
         if (argc == n+1)                                        \
-            return_value = service::do_##name(document, params);\
+            return_value = service::do_##name(params);\
         else                                                    \
             return_value = PDL_FALSE;
 
@@ -123,7 +135,7 @@ PDL_bool handler(PDL_JSParameters* params)
         ELSE_TYPE(saveas, 3)
         else
         {
-            PDL_JSException(parms, ("Handler has no method " + type).c_str());
+            PDL_JSException(params, ("Handler has no method " + type).c_str());
             return_value = PDL_FALSE;
         }
     }
@@ -136,21 +148,21 @@ exit:
     return return_value;
 }
 
-const char version_information[] = "mupdf 0.9"
+const char* version_information = "mupdf 0.9";
 
 int main()
 {
-    PDL_Init();
+    PDL_Init(0);
     SDL_Init(SDL_INIT_VIDEO);
 
-    pthread_mutex_init(&mutex);
+    pthread_mutex_init(&mutex, 0);
 
     PDL_RegisterJSHandler("Handler", &handler);
     PDL_JSRegistrationComplete();
 
     PDL_CallJS("VersionCallback", &version_information, 1);
 
-    pthread_mutex_destroy(&m_mutex);
+    pthread_mutex_destroy(&mutex);
 
     if (document)
         delete document;

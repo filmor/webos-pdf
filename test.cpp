@@ -21,11 +21,7 @@ int main(int argc, char** argv)
     // Derived from renderer which handles the glyph cache
     png_renderer renderer;
 
-    double zoom = 8.0;
-    renderer.render_full(zoom, page, std::string(filename) + ".png");
-
-    // Thumbnail:
-    renderer.render_full(1.0, page, std::string(filename) + "-thumb.png");
+    renderer.render_full(2.28, page, std::string(filename) + ".png");
 
     // TODO: GLES texture
     // TODO: more rendering options (especially partial rendering)
