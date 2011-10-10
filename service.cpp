@@ -13,7 +13,8 @@ pthread_mutex_t mutex;
 viewer::pdf_document* document = 0;
 
 // <path><prefix><page>-<zoom><suffix>
-const boost::format format ("%1$s%2$s%5$04d-%3$03d%4$s");
+const boost::format filename_format ("%1$s%2$s%5$04d-%3$03d%4$s");
+const boost::format error ("{\"error\":\"%s\"");
 
 namespace service
 {
@@ -23,8 +24,7 @@ PDL_bool do_shell(PDL_JSParameters* params)
     return PDL_TRUE;
 }
 
-const boost::format response ("{\"pages\":%d,\"width\":%d,\"height\":%d}");
-const boost::format error ("{\"error\":\"%s\"");
+const boost::format open_response ("{\"pages\":%d,\"width\":%d,\"height\":%d}");
 
 PDL_bool do_open(PDL_JSParameters* params)
 {
@@ -33,9 +33,9 @@ PDL_bool do_open(PDL_JSParameters* params)
     try
     {
         document = new viewer::pdf_document(PDL_GetJSParamString(params, 1));
-        r = (boost::format(response) % document->pages()
-                                    % (*document)[0].width()
-                                    % (*document)[0].height()).str();
+        r = (boost::format(open_response) % document->pages()
+                                          % (*document)[0].width()
+                                          % (*document)[0].height()).str();
     }
     catch (viewer::pdf_exception const& exc)
     {
@@ -44,14 +44,10 @@ PDL_bool do_open(PDL_JSParameters* params)
 
     const char* ptr = r.c_str();
 
-    PDL_CallJS("OpenCallback", &ptr, 1);
+    syslog(LOG_WARNING, "Open Called");
+    syslog(LOG_WARNING, r.c_str());
 
-    // {
-    //  error : "String" if failed,
-    //  pages : document.pages(),
-    //  width : document[0].width(),
-    //  height : document[0].height,
-    // }
+    PDL_CallJS("OpenCallback", &ptr, 1);
 
     return PDL_TRUE;
 }
@@ -68,17 +64,23 @@ PDL_bool do_toc(PDL_JSParameters* params)
     return PDL_TRUE;
 }
 
+const boost::format render_response
+    ("{\"from\":%d,\"image\":\"%s\"}");
+
 PDL_bool do_render(PDL_JSParameters* params)
 {
     PDL_bool return_value = PDL_TRUE;
 
+    syslog(LOG_WARNING, "Render called");
+
     viewer::png_renderer renderer;
 
-    boost::format my_formatter(format);
+    boost::format my_formatter(filename_format);
 
     int from = PDL_GetJSParamInt(params, 1);
     int count = PDL_GetJSParamInt(params, 2);
     int zoom = PDL_GetJSParamInt(params, 3);
+    const char* zoom_str = PDL_GetJSParamString(params, 3);
     std::string directory = PDL_GetJSParamString(params, 4);
     std::string prefix = PDL_GetJSParamString(params, 5);
     std::string suffix = PDL_GetJSParamString(params, 6);
@@ -93,10 +95,16 @@ PDL_bool do_render(PDL_JSParameters* params)
 
         for (int i = from; i < from + count; ++i)
         {
+            std::string filename = (boost::format(my_formatter) % i).str();
             viewer::pdf_page& page = (*document)[i];
-            renderer.render_full(zoom / 100., page,
-                                 (boost::format(my_formatter) % i).str()
-                                );
+            renderer.render_full(zoom / 100., page, filename);
+
+            std::string response_json =
+                (boost::format(render_response) % i % filename).str();
+
+            const char* response[] = { zoom_str, response_json.c_str() };
+
+            PDL_CallJS("RenderCallback", response, 2);
         }
     }
     catch (...)
@@ -104,6 +112,8 @@ PDL_bool do_render(PDL_JSParameters* params)
         return_value = PDL_FALSE;
     }
     pthread_mutex_unlock(&mutex);
+
+    syslog(LOG_WARNING, "Done rendering");
 
     return return_value;
 }
@@ -169,7 +179,7 @@ exit:
     return return_value;
 }
 
-const char* version_information = "mupdf 0.9";
+const char* version_information = "{\"version\":\"mupdf 0.9\"}";
 
 int main()
 {
@@ -195,6 +205,8 @@ int main()
     while (event.type != SDL_QUIT);
 
     pthread_mutex_destroy(&mutex);
+
+    syslog(LOG_WARNING, "Goodbye");
 
     if (document)
         delete document;
