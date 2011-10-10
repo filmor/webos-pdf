@@ -26,6 +26,11 @@ namespace viewer
         pages_.resize(pdf_count_pages(xref_));
     }
 
+    std::string pdf_document::unique_id() const
+    {
+
+    }
+
     pdf_document::~pdf_document()
     {
         pdf_free_xref(xref_);

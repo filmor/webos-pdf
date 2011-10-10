@@ -36,6 +36,7 @@ namespace viewer
         pdf_page& operator[] (std::size_t index);
 
         std::size_t pages() const;
+        std::string unique_id() const;
 
     private:
         pdf_xref* xref_;

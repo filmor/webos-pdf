@@ -1,11 +1,18 @@
+#include <fstream>
+
 #include <pthread.h>
 #include <syslog.h>
+// mkdir, move to filesystem.hpp
+#include <sys/stat.h>
 
 #include <PDL.h>
 #include <SDL.h>
 
 #include <boost/format.hpp>
 
+#include "md5.h"
+#include "md5_to_string.hpp"
+#include "filesystem.hpp"
 #include "pdf_document.hpp"
 #include "png_renderer.hpp"
 
@@ -24,31 +31,51 @@ PDL_bool do_shell(PDL_JSParameters* params)
     return PDL_TRUE;
 }
 
-const boost::format open_response ("{\"pages\":%d,\"width\":%d,\"height\":%d}");
+const boost::format open_response
+    ("{\"pages\":%d,\"width\":%d,\"height\":%d,\"units\":\"pt\",\"dst\":\"/media/internal/appdata/com.quickoffice.ar/.cache/%s\"}");
 
 PDL_bool do_open(PDL_JSParameters* params)
 {
     std::string r = "";
+    syslog(LOG_INFO, "Open Called");
     pthread_mutex_lock(&mutex);
     try
     {
-        document = new viewer::pdf_document(PDL_GetJSParamString(params, 1));
+        std::string filename = PDL_GetJSParamString(params, 1);
+        document = new viewer::pdf_document(filename);
+
+        // Generate Unique ID as an md5 of the first kilobyte of the file
+        std::ifstream file (filename.c_str());
+        
+        md5_state_s md5;
+        md5_init(&md5);
+        md5_byte_t buffer[1024];
+        file.read((char*)buffer, 1024);
+        md5_append(&md5, buffer, file.gcount());
+        file.close();
+
+        // Reuse buffer
+        md5_finish(&md5, buffer);
+
+        // Generate hex output
+        std::string digest = md5::md5_to_string(buffer + 0, buffer + 16);
+
         r = (boost::format(open_response) % document->pages()
                                           % (*document)[0].width()
-                                          % (*document)[0].height()).str();
+                                          % (*document)[0].height()
+                                          % digest).str();
     }
     catch (viewer::pdf_exception const& exc)
     {
         r = (boost::format(error) % exc.what()).str();
     }
+    pthread_mutex_unlock(&mutex);
 
     const char* ptr = r.c_str();
 
-    syslog(LOG_WARNING, "Open Called");
-    syslog(LOG_WARNING, r.c_str());
+    syslog(LOG_INFO, "Open Finished");
 
     PDL_CallJS("OpenCallback", &ptr, 1);
-
     return PDL_TRUE;
 }
 
@@ -71,7 +98,7 @@ PDL_bool do_render(PDL_JSParameters* params)
 {
     PDL_bool return_value = PDL_TRUE;
 
-    syslog(LOG_WARNING, "Render called");
+    syslog(LOG_INFO, "Render called");
 
     viewer::png_renderer renderer;
 
@@ -80,31 +107,46 @@ PDL_bool do_render(PDL_JSParameters* params)
     int from = PDL_GetJSParamInt(params, 1);
     int count = PDL_GetJSParamInt(params, 2);
     int zoom = PDL_GetJSParamInt(params, 3);
-    const char* zoom_str = PDL_GetJSParamString(params, 3);
-    std::string directory = PDL_GetJSParamString(params, 4);
+    std::string directory =  PDL_GetJSParamString(params, 4);
+    syslog(LOG_INFO, directory.c_str());
     std::string prefix = PDL_GetJSParamString(params, 5);
     std::string suffix = PDL_GetJSParamString(params, 6);
 
     my_formatter % directory % prefix % zoom % suffix;
 
-    pthread_mutex_lock(&mutex);
+    if (pthread_mutex_trylock(&mutex))
+    {
+        PDL_JSException(params, "worker thread busy");
+        return PDL_FALSE;
+    }
     try
     {
         if (!document)
             throw "";
 
+        int err = ::mkdir(directory.c_str(), 0755);
+        if (errno != 0 && errno != EEXIST)
+        {
+            PDL_JSException(params, "could not create directory");
+            throw "";
+        }
+
         for (int i = from; i < from + count; ++i)
         {
+            syslog(LOG_INFO, "Starting rendering");
             std::string filename = (boost::format(my_formatter) % i).str();
             viewer::pdf_page& page = (*document)[i];
+            syslog(LOG_INFO, filename.c_str());
             renderer.render_full(zoom / 100., page, filename);
 
             std::string response_json =
                 (boost::format(render_response) % i % filename).str();
 
-            const char* response[] = { zoom_str, response_json.c_str() };
+            const char* response = response_json.c_str();
 
-            PDL_CallJS("RenderCallback", response, 2);
+            syslog(LOG_INFO, ("Finished rendering " + response_json).c_str());
+
+            PDL_CallJS("RenderCallback", &response, 1);
         }
     }
     catch (...)
@@ -113,7 +155,7 @@ PDL_bool do_render(PDL_JSParameters* params)
     }
     pthread_mutex_unlock(&mutex);
 
-    syslog(LOG_WARNING, "Done rendering");
+    syslog(LOG_INFO, "Done rendering");
 
     return return_value;
 }
@@ -130,9 +172,18 @@ PDL_bool do_find(PDL_JSParameters* params)
     return PDL_TRUE;
 }
 
+const boost::format saveas_response("{\"result\":%d}");
 PDL_bool do_saveas(PDL_JSParameters* params)
 {
-    // STUB!
+    std::string src = PDL_GetJSParamString(params, 2);
+    std::string dst = PDL_GetJSParamString(params, 3);
+    bool overwrite = PDL_GetJSParamInt(params, 4);
+
+    int result = filesystem::copy_file(src, "/media/internal/" + dst, overwrite);
+    std::string response = (boost::format(saveas_response) % result).str();
+    
+    const char* ptr = response.c_str();
+    PDL_CallJS("SaveAsCallback", &ptr, 1);
     return PDL_TRUE;
 }
 }
@@ -183,7 +234,7 @@ const char* version_information = "{\"version\":\"mupdf 0.9\"}";
 
 int main()
 {
-    syslog(LOG_WARNING, "Starting up");
+    syslog(LOG_INFO, "Starting up");
     SDL_Init(SDL_INIT_VIDEO);
     PDL_Init(0);
 
@@ -195,7 +246,7 @@ int main()
     PDL_CallJS("ready", 0, 0);
     PDL_CallJS("VersionCallback", &version_information, 1);
 
-    syslog(LOG_WARNING, "Hello world! :)");
+    syslog(LOG_INFO, "Hello world! :)");
 
     SDL_Event event;
     do
@@ -206,7 +257,7 @@ int main()
 
     pthread_mutex_destroy(&mutex);
 
-    syslog(LOG_WARNING, "Goodbye");
+    syslog(LOG_INFO, "Goodbye");
 
     if (document)
         delete document;
