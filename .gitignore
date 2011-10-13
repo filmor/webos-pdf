@@ -1,0 +1,4 @@
+.*.sw[po]
+.waf*
+.lock-wafbuild
+build/
