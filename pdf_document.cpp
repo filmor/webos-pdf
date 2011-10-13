@@ -21,14 +21,12 @@ namespace viewer
                 ),
                 "Could not open document");
 
-        PDF_TRY(pdf_load_page_tree(xref_), "Could load page tree");
+        PDF_TRY(pdf_load_page_tree(xref_), "Could not load page tree");
 
-        pages_.resize(pdf_count_pages(xref_));
-    }
+        const std::size_t page_count = pdf_count_pages(xref_);
+        PDF_TRY(page_count == 0, "Empty document");
 
-    std::string pdf_document::unique_id() const
-    {
-
+        pages_.resize(page_count);
     }
 
     pdf_document::~pdf_document()
@@ -64,13 +62,14 @@ namespace viewer
                 "Could not draw page");
         fz_free_device(dev);
 
-        // Load text
+        // Load text, we don't use this now, so we don't need to spend time for
+        // it
+#if 0
         text_span_ = fz_new_text_span();
         dev = fz_new_text_device(text_span_);
         fz_execute_display_list(list_, dev, fz_identity, fz_infinite_bbox);
         fz_free_device(dev);
-
-        fz_text_span* span = text_span_;
+#endif
     }
 
     fz_bbox pdf_page::get_bbox(fz_matrix const& matrix) const

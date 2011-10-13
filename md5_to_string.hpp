@@ -23,8 +23,11 @@ namespace md5
         std::string result;
         result.reserve(32);
 
-        std::size_t i=0;
-        for (IteratorT it_data = begin; it_data!=end; ++it_data, ++i) {
+        std::size_t i = 0;
+        for (IteratorT it_data = begin;
+             it_data != end && i < 32;
+             ++it_data, ++i)
+        {
             const size_t hi = ((*it_data) >> 4) & 0x0F;
             result += detail::to_char(hi);
 

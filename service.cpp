@@ -65,9 +65,13 @@ PDL_bool do_open(PDL_JSParameters* params)
                                           % (*document)[0].height()
                                           % digest).str();
     }
-    catch (viewer::pdf_exception const& exc)
+    catch (std::exception const& exc)
     {
         r = (boost::format(error) % exc.what()).str();
+    }
+    catch (...)
+    {
+        r = (boost::format(error) % "Unknown error");
     }
     pthread_mutex_unlock(&mutex);
 
