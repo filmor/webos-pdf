@@ -8,9 +8,14 @@
 #include <PDL.h>
 #include <SDL.h>
 
+// For md5
+extern "C"
+{
+#include <fitz.h>
+}
+
 #include <boost/format.hpp>
 
-#include "md5.h"
 #include "md5_to_string.hpp"
 #include "filesystem.hpp"
 #include "pdf_document.hpp"
@@ -47,15 +52,15 @@ PDL_bool do_open(PDL_JSParameters* params)
         // Generate Unique ID as an md5 of the first kilobyte of the file
         std::ifstream file (filename.c_str());
         
-        md5_state_s md5;
-        md5_init(&md5);
-        md5_byte_t buffer[1024];
+        fz_md5 md5;
+        fz_md5_init(&md5);
+        unsigned char buffer[1024];
         file.read((char*)buffer, 1024);
-        md5_append(&md5, buffer, file.gcount());
+        fz_md5_update(&md5, buffer, file.gcount());
         file.close();
 
         // Reuse buffer
-        md5_finish(&md5, buffer);
+        fz_md5_final(&md5, buffer);
 
         // Generate hex output
         std::string digest = md5::md5_to_string(buffer + 0, buffer + 16);
@@ -71,7 +76,7 @@ PDL_bool do_open(PDL_JSParameters* params)
     }
     catch (...)
     {
-        r = (boost::format(error) % "Unknown error");
+        r = (boost::format(error) % "Unknown error").str();
     }
     pthread_mutex_unlock(&mutex);
 
@@ -230,7 +235,6 @@ PDL_bool handler(PDL_JSParameters* params)
         return_value = PDL_FALSE;
     }
 
-exit:
     return return_value;
 }
 
