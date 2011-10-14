@@ -45,12 +45,12 @@ def configure(conf):
 def build(bld):
     service = "service.cpp"
     test = "test.cpp"
-    mains = [test, service]
+    gles = "gles.cpp"
+    mains = [test, service, gles]
     sources = [i for i in bld.path.ant_glob("*.cpp") if not basename(str(i)) in mains]
-    print sources
     bld.objects(source = sources,
             use = "MUPDF FITZ PDK SDL BOOST", target = "objs"
             )
     for main in mains:
-        bld.program(source=str(main), use="BOOST objs", target=str(main)[:-4])
+        bld.program(source=str(main), use="BOOST objs", target="arx" + str(main)[:-4])
 

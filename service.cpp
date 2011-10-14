@@ -42,7 +42,6 @@ const boost::format open_response
 PDL_bool do_open(PDL_JSParameters* params)
 {
     std::string r = "";
-    syslog(LOG_INFO, "Open Called");
     pthread_mutex_lock(&mutex);
     try
     {
@@ -82,8 +81,6 @@ PDL_bool do_open(PDL_JSParameters* params)
 
     const char* ptr = r.c_str();
 
-    syslog(LOG_INFO, "Open Finished");
-
     PDL_CallJS("OpenCallback", &ptr, 1);
     return PDL_TRUE;
 }
@@ -107,8 +104,6 @@ PDL_bool do_render(PDL_JSParameters* params)
 {
     PDL_bool return_value = PDL_TRUE;
 
-    syslog(LOG_INFO, "Render called");
-
     viewer::png_renderer renderer;
 
     boost::format my_formatter(filename_format);
@@ -116,8 +111,7 @@ PDL_bool do_render(PDL_JSParameters* params)
     int from = PDL_GetJSParamInt(params, 1);
     int count = PDL_GetJSParamInt(params, 2);
     int zoom = PDL_GetJSParamInt(params, 3);
-    std::string directory =  PDL_GetJSParamString(params, 4);
-    syslog(LOG_INFO, directory.c_str());
+    std::string directory = PDL_GetJSParamString(params, 4);
     std::string prefix = PDL_GetJSParamString(params, 5);
     std::string suffix = PDL_GetJSParamString(params, 6);
 
@@ -131,40 +125,46 @@ PDL_bool do_render(PDL_JSParameters* params)
     try
     {
         if (!document)
-            throw "";
+            throw std::runtime_error("Document has not been opened yet");
 
         int err = ::mkdir(directory.c_str(), 0755);
-        if (errno != 0 && errno != EEXIST)
-        {
-            PDL_JSException(params, "could not create directory");
-            throw "";
-        }
+        if (err != 0 && errno != EEXIST)
+            throw std::runtime_error("could not create directory");
 
         for (int i = from; i < from + count; ++i)
         {
-            syslog(LOG_INFO, "Starting rendering");
             std::string filename = (boost::format(my_formatter) % i).str();
-            viewer::pdf_page& page = (*document)[i];
-            syslog(LOG_INFO, filename.c_str());
-            renderer.render_full(zoom / 100., page, filename);
+
+            if (::access(filename.c_str(), R_OK) == -1 && errno == ENOENT)
+            {
+                syslog(LOG_INFO, "Starting rendering of page %d", i);
+                viewer::pdf_page& page = (*document)[i];
+                renderer.render_full(zoom / 100., page, filename);
+            }
+            else
+            {
+                syslog(LOG_INFO, "Reusing cached image of page %d", i);
+            }
 
             std::string response_json =
                 (boost::format(render_response) % i % filename).str();
 
             const char* response = response_json.c_str();
 
-            syslog(LOG_INFO, ("Finished rendering " + response_json).c_str());
-
             PDL_CallJS("RenderCallback", &response, 1);
+            syslog(LOG_INFO, "Done rendering page %d", i);
         }
+    }
+    catch (std::exception const& exc)
+    {
+        PDL_JSException(params, exc.what());
+        return_value = PDL_FALSE;
     }
     catch (...)
     {
         return_value = PDL_FALSE;
     }
     pthread_mutex_unlock(&mutex);
-
-    syslog(LOG_INFO, "Done rendering");
 
     return return_value;
 }
@@ -203,6 +203,7 @@ PDL_bool handler(PDL_JSParameters* params)
     int argc = PDL_GetNumJSParams(params);
 
     std::string type(PDL_GetJSParamString(params, 0));
+    syslog(LOG_INFO, "Handler called with mode %s", type.c_str());
 
 #define IF_TYPE(name, n)                                        \
     if (type == #name)                                          \
