@@ -4,6 +4,8 @@
 #include <string>
 #include <stdexcept>
 #include <vector>
+#include <utility>
+#include <tuple>
 
 extern "C"
 {
@@ -26,12 +28,17 @@ namespace viewer
     {
     public:
         friend class pdf_page;
+        typedef std::tuple<bool, std::size_t, std::size_t> find_result_type;
 
         // TODO Use streams
         pdf_document(std::string const& filename,
                      std::string const& password = "")
             ;
         ~pdf_document();
+
+        find_result_type
+            find_next(std::string const& text, std::size_t page);
+        
 
         pdf_page& operator[] (std::size_t index);
 
@@ -56,11 +63,7 @@ namespace viewer
         void run(fz_device* device, fz_matrix const& matrix,
                  fz_bbox const& bbox) const;
 
-        void run(fz_device* device, fz_matrix const& matrix) const
-        {
-            run(device, matrix, get_bbox(matrix));
-        }
-
+        int find_text(std::string const&, std::size_t start = 0) const;
 
     private:
         pdf_document& doc_;

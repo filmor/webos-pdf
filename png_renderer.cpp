@@ -2,20 +2,16 @@
 
 namespace viewer
 {
-    png_renderer::png_renderer()
-        : colorspace_(fz_device_rgb)
+    png_renderer::png_renderer(fz_glyph_cache* glyphcache)
+        : glyphcache_(glyphcache), colorspace_(fz_device_rgb)
     {
-        fz_accelerate();
-        fz_set_aa_level(8);
-
-        glyphcache_ = fz_new_glyph_cache();
     }
 
 
     void png_renderer::render_full(float zoom, pdf_page const& page,
                                    std::string const& filename)
     {
-        fz_matrix ctm = fz_translate(0, -(int)page.height());
+        fz_matrix ctm = fz_translate(0, -int(page.height()));
         ctm = fz_concat(ctm, fz_scale(zoom, -zoom));
         ctm = fz_concat(ctm, fz_rotate(page.rotate()));
 
@@ -25,7 +21,7 @@ namespace viewer
         fz_clear_pixmap_with_color(pix, 255);
 
         fz_device* dev = fz_new_draw_device(glyphcache_, pix);
-
+        // TODO here?
         page.run(dev, ctm, bbox);
         fz_free_device(dev);
 
@@ -36,7 +32,6 @@ namespace viewer
 
     png_renderer::~png_renderer()
     {
-        fz_free_glyph_cache(glyphcache_);
     }
 
 }

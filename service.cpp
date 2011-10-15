@@ -23,6 +23,7 @@ extern "C"
 
 pthread_mutex_t mutex;
 viewer::pdf_document* document = 0;
+fz_glyph_cache* glyph_cache = 0;
 
 // <path><prefix><page>-<zoom><suffix>
 const boost::format filename_format ("%1$s%2$s%5$04d-%3$03d%4$s");
@@ -104,7 +105,6 @@ PDL_bool do_render(PDL_JSParameters* params)
 {
     PDL_bool return_value = PDL_TRUE;
 
-    viewer::png_renderer renderer;
 
     boost::format my_formatter(filename_format);
 
@@ -124,6 +124,7 @@ PDL_bool do_render(PDL_JSParameters* params)
     }
     try
     {
+        viewer::png_renderer renderer(glyph_cache);
         if (!document)
             throw std::runtime_error("Document has not been opened yet");
 
@@ -152,6 +153,7 @@ PDL_bool do_render(PDL_JSParameters* params)
             const char* response = response_json.c_str();
 
             PDL_CallJS("RenderCallback", &response, 1);
+            fz_flush_warnings();
             syslog(LOG_INFO, "Done rendering page %d", i);
         }
     }
@@ -247,6 +249,10 @@ int main()
     SDL_Init(SDL_INIT_VIDEO);
     PDL_Init(0);
 
+    glyph_cache = fz_new_glyph_cache();
+    fz_accelerate();
+    fz_set_aa_level(8);
+
     pthread_mutex_init(&mutex, 0);
 
     PDL_RegisterJSHandler("Handler", &handler);
@@ -254,8 +260,6 @@ int main()
 
     PDL_CallJS("ready", 0, 0);
     PDL_CallJS("VersionCallback", &version_information, 1);
-
-    syslog(LOG_INFO, "Hello world! :)");
 
     SDL_Event event;
     do
@@ -266,7 +270,7 @@ int main()
 
     pthread_mutex_destroy(&mutex);
 
-    syslog(LOG_INFO, "Goodbye");
+    fz_free_glyph_cache(glyph_cache);
 
     if (document)
         delete document;

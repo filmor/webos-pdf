@@ -14,7 +14,7 @@ def configure(conf):
     mode = "release"
 
     conf.load('compiler_cxx boost')
-    for i in "-Wall -g3 -O2".split():
+    for i in "-Wall -g3 -O2 -std=c++0x".split():
         conf.env.append_value('CXXFLAGS', i)
 
     # PDK
@@ -44,9 +44,8 @@ def configure(conf):
 
 def build(bld):
     service = "service.cpp"
-    test = "test.cpp"
     gles = "gles.cpp"
-    mains = [test, service, gles]
+    mains = [service, gles]
     sources = [i for i in bld.path.ant_glob("*.cpp") if not basename(str(i)) in mains]
     bld.objects(source = sources,
             use = "MUPDF FITZ PDK SDL BOOST", target = "objs"

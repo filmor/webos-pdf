@@ -34,6 +34,20 @@ namespace viewer
         pdf_free_xref(xref_);
     }
 
+    pdf_document::find_result_type
+        pdf_document::find_next(std::string const& text, std::size_t page)
+    {
+        for (std::size_t i = page; i < pages(); ++i)
+        {
+            pdf_page const& page = (*this)[i];
+            int res = page.find_text(text);
+            if (res != -1)
+                return find_result_type(true, i, res);
+        }
+        return find_result_type(false, 0, 0);
+    }
+    
+
     pdf_page& pdf_document::operator[] (std::size_t index)
     {
         if (index >= pages_.size())
@@ -62,14 +76,10 @@ namespace viewer
                 "Could not draw page");
         fz_free_device(dev);
 
-        // Load text, we don't use this now, so we don't need to spend time for
-        // it
-#if 0
         text_span_ = fz_new_text_span();
         dev = fz_new_text_device(text_span_);
         fz_execute_display_list(list_, dev, fz_identity, fz_infinite_bbox);
         fz_free_device(dev);
-#endif
     }
 
     fz_bbox pdf_page::get_bbox(fz_matrix const& matrix) const
@@ -91,6 +101,34 @@ namespace viewer
     std::size_t pdf_page::width() const
     {
         return std::abs(page_->mediabox.x1 - page_->mediabox.x0);
+    }
+
+    int pdf_page::find_text(std::string const& text, std::size_t start) const
+    {
+        fz_text_span* span = text_span_;
+        std::size_t offset = 0;
+        std::size_t match_index = 0;
+        while (span)
+        {
+            // TODO: Check for span->eol and, if that's the case add 1 to offset
+            //       and act like there is a ' ' at the end of the line
+            for (std::size_t i = 0; i < span->len; ++i)
+            {
+                // This could be optimised by doing some checking before
+                // starting the loop
+                if (offset + i < start)
+                    continue;
+
+                if (span->text[i].c == text[match_index])
+                    ++match_index;
+
+                if (match_index == text.size())
+                    return offset + i - text.size();
+            }
+            offset += span->len;
+            span = span->next;
+        }
+        return -1;
     }
 
     pdf_page::~pdf_page()

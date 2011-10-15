@@ -9,7 +9,7 @@ namespace viewer
     class png_renderer
     {
     public:
-        png_renderer();
+        png_renderer(fz_glyph_cache* glyphcache);
         ~png_renderer();
 
         void render_full(float zoom, pdf_page const& page,
