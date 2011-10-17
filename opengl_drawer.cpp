@@ -31,18 +31,40 @@ namespace viewer
 
         glBindTexture(GL_TEXTURE_2D, texture_);
 
+        // TODO: convert binary data
+        // TODO: Compress
         // TODO: Mipmaps?
         glTexImage2D(GL_TEXTURE_2D, 0 /* mipmap level */, 3 /* color components*/,
                      page.width(), page.height(), 0 /* border */,
-                     GL_RGB, GL_UNSIGNED_INT,
+                     GL_RGB, GL_UNSIGNED_SHORT_5_6_5,
                      pix.get_data());
+
+        static const float array[] = 
+            {
+                0f, 0f, -1f,
+                1f, 0f, -1f,
+                1f, 1f, -1f,
+                0f, 1f, -1f
+            };
+        
+        glVertexAttribPointer(0, 3, GL_FLOAT, 0, 0, &array);
+        glEnableVertexAttribArray(0);
+        // TODO: Load texture
+    }
+
+    opengl_drawer::opengl_drawer()
+    {
+        glDisableVertexAttribArray(0);
+        glDeleteTextures(1, &texture_);
     }
 
     void opengl_drawer::operator() ()
     {
-        // glDrawArrays();
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
         SDL_GL_SwapBuffers();
     }
+
 
 }

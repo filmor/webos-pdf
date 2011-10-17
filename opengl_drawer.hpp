@@ -13,6 +13,7 @@ namespace viewer
     {
     public:
         opengl_drawer (pdf_document&, SDL_Surface*);
+        ~opengl_drawer ();
 
         void operator()();
 
