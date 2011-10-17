@@ -49,9 +49,7 @@ def configure(conf):
 
 def build(bld):
     # TODO: Proper dependencies
-    service = "service.cpp"
-    gles = "gles.cpp"
-    mains = [service, gles]
+    mains = ["service.cpp", "gles.cpp"]
     sources = [i for i in bld.path.ant_glob("*.cpp") if not basename(str(i)) in mains]
     bld.objects(source = sources,
             use = "MUPDF FITZ PDK SDL BOOST GL", target = "objs"
