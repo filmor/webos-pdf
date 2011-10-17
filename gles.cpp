@@ -79,6 +79,7 @@ int main (int argc, char** argv)
     }
     while (running);
 
+    delete doc;
     PDL_Quit();
     SDL_Quit();
 }

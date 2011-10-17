@@ -19,10 +19,11 @@ extern "C"
 #include "md5_to_string.hpp"
 #include "filesystem.hpp"
 #include "pdf_document.hpp"
-#include "png_renderer.hpp"
+#include "pixmap_renderer.hpp"
 
 pthread_mutex_t mutex;
 viewer::pdf_document* document = 0;
+viewer::pixmap_renderer renderer;
 fz_glyph_cache* glyph_cache = 0;
 
 // <path><prefix><page>-<zoom><suffix>
@@ -124,7 +125,6 @@ PDL_bool do_render(PDL_JSParameters* params)
     }
     try
     {
-        viewer::png_renderer renderer(glyph_cache);
         if (!document)
             throw std::runtime_error("Document has not been opened yet");
 
@@ -140,7 +140,7 @@ PDL_bool do_render(PDL_JSParameters* params)
             {
                 syslog(LOG_INFO, "Starting rendering of page %d", i);
                 viewer::pdf_page& page = (*document)[i];
-                renderer.render_full(zoom / 100., page, filename);
+                renderer.render_full(zoom / 100., page).write_png(filename);
             }
             else
             {

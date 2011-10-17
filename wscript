@@ -28,6 +28,11 @@ def configure(conf):
     conf.env.append_value("DEFINES_SDL", ["_GNU_SOURCE=1", "_REENTRANT"])
     conf.env.append_value("LIB_SDL", ["SDL", "pthread"])
 
+    # GL
+    conf.env.append_value("INCLUDES_GL", join(PDK_PATH, "include"))
+    conf.env.append_value("LIBPATH_GL", join(PDK_PATH, "device", "lib"))
+    conf.env.append_value("LIB_GL", ["GLESv2"])
+
     # FITZ
     conf.env.append_value("INCLUDES_FITZ", join(MUPDF_PATH, "fitz"))
     conf.env.append_value("STLIBPATH_FITZ", join(MUPDF_PATH, "build", mode))
@@ -43,12 +48,13 @@ def configure(conf):
     conf.check_boost()
 
 def build(bld):
+    # TODO: Proper dependencies
     service = "service.cpp"
     gles = "gles.cpp"
     mains = [service, gles]
     sources = [i for i in bld.path.ant_glob("*.cpp") if not basename(str(i)) in mains]
     bld.objects(source = sources,
-            use = "MUPDF FITZ PDK SDL BOOST", target = "objs"
+            use = "MUPDF FITZ PDK SDL BOOST GL", target = "objs"
             )
     for main in mains:
         bld.program(source=str(main), use="BOOST objs", target="arx" + str(main)[:-4])
