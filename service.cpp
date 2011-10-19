@@ -16,8 +16,8 @@ extern "C"
 
 #include <boost/format.hpp>
 
-#include "md5_to_string.hpp"
-#include "filesystem.hpp"
+#include "util/md5_to_string.hpp"
+#include "util/filesystem.hpp"
 #include "pdf_document.hpp"
 #include "pixmap_renderer.hpp"
 

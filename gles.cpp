@@ -6,7 +6,7 @@
 #include <GLES2/gl2.h>
 
 #include "pdf_document.hpp"
-#include "opengl_drawer.hpp"
+#include "gles_drawer.hpp"
 
 using namespace viewer;
 
@@ -38,7 +38,7 @@ int main (int argc, char** argv)
 
     SDL_Surface* screen = SDL_SetVideoMode(0, 0, 0, SDL_OPENGL);
 
-    opengl_drawer draw(*doc, screen);
+    gles_drawer draw(*doc, screen);
 
     SDL_Event event;
     do

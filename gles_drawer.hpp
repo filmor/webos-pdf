@@ -1,19 +1,22 @@
-#ifndef OPENGL_DRAWER_HPP
-#define OPENGL_DRAWER_HPP
+#ifndef GLES_DRAWER_HPP
+#define GLES_DRAWER_HPP
+
+#include <vector>
 
 #include <SDL.h>
 
 #include "pdf_document.hpp"
 #include "pixmap_renderer.hpp"
+#include "gles/program.hpp"
 
 namespace viewer
 {
 
-    class opengl_drawer
+    class gles_drawer
     {
     public:
-        opengl_drawer (pdf_document&, SDL_Surface*);
-        ~opengl_drawer ();
+        gles_drawer (pdf_document&, SDL_Surface*);
+        ~gles_drawer ();
 
         void operator()();
 
@@ -22,6 +25,9 @@ namespace viewer
     private:
         pdf_document& doc_;
         pixmap_renderer renderer_;
+        gles::program program_;
+        std::vector<float> vertex_array_;
+        std::vector<float> texcoord_array_;
         unsigned int texture_;
     };
 

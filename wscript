@@ -49,11 +49,22 @@ def configure(conf):
 
 def build(bld):
     # TODO: Proper dependencies
-    mains = ["service.cpp", "gles.cpp"]
-    sources = [i for i in bld.path.ant_glob("*.cpp") if not basename(str(i)) in mains]
-    bld.objects(source = sources,
-            use = "MUPDF FITZ PDK SDL BOOST GL", target = "objs"
+    add_cpp = lambda *args: [ i + ".cpp" for i in args ]
+
+    common = add_cpp("pdf_document", "pixmap_renderer")
+    bld.objects(source = common,
+            use = "MUPDF FITZ BOOST SDL PDK", target = "common"
             )
-    for main in mains:
-        bld.program(source=str(main), use="BOOST objs", target="arx" + str(main)[:-4])
+
+    programs = {
+                 "arxservice" :
+                    (add_cpp("service", "util/filesystem"), []),
+                 "gles" : 
+                    (add_cpp("gles", "gles_drawer"), ["GL"])
+               }
+
+    for prog, t in programs.items():
+        bld.program(source=t[0],
+                    use=["common"] + t[1],
+                    target=prog)
 
