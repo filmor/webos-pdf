@@ -59,8 +59,8 @@ def build(bld):
     programs = {
                  "arxservice" :
                     (add_cpp("service", "util/filesystem"), []),
-                 "gles" : 
-                    (add_cpp("gles", "gles_drawer"), ["GL"])
+                 "gles_test" : 
+                    (add_cpp("gles", "gles_drawer", "gles/program"), ["GL"])
                }
 
     for prog, t in programs.items():
