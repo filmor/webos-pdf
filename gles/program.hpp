@@ -27,9 +27,8 @@ namespace gles
 
         void add_shader(std::string const& code, bool vertex_shader);
 
-        template <typename T>
-        void bind(std::string const&, T)
-        {}
+        void bind_attrib(std::string const& name, GLuint index) const;
+        GLint get_uniform_location(std::string const& name) const;
 
         void link();
         void use();

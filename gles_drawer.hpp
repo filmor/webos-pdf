@@ -28,7 +28,8 @@ namespace viewer
         gles::program program_;
         std::vector<float> vertex_array_;
         std::vector<float> texcoord_array_;
-        unsigned int texture_;
+        GLuint texture_;
+        GLuint vbo_;
     };
 
 }

@@ -24,7 +24,9 @@ namespace gles
                                              GL_VERTEX_SHADER :
                                              GL_FRAGMENT_SHADER);
 
-        glShaderSource(shader, 1, (const char**) (code.c_str()), 0);
+        const GLint code_size = code.size();
+        const char* code_ptr = code.c_str();
+        glShaderSource(shader, 1, &code_ptr, &code_size);
         glCompileShader(shader);
 
         GLint shader_compiled;
@@ -83,6 +85,15 @@ namespace gles
 
         glUseProgram(handle_);
     }
-    
+
+    void program::bind_attrib(std::string const& name, GLuint index) const
+    {
+        glBindAttribLocation(handle_, index, name.c_str());
+    }
+
+    GLint program::get_uniform_location(std::string const& name) const
+    {
+        return glGetUniformLocation(handle_, name.c_str());
+    }
 
 }
