@@ -12,7 +12,7 @@ using namespace viewer;
 
 int main (int argc, char** argv)
 {
-    bool paused = false, running = false;
+    bool paused = false, running = true;
     if (argc != 2)
         return 1;
 
@@ -45,7 +45,7 @@ int main (int argc, char** argv)
     {
         draw();
 
-        bool got_event;
+        bool got_event = false;
         if (paused)
         {
             SDL_WaitEvent(&event);
@@ -72,9 +72,9 @@ int main (int argc, char** argv)
 
             case SDL_QUIT:
                 running = false;
-                got_event = false;
                 break;
             }
+            got_event = SDL_PollEvent(&event);
         }
     }
     while (running);

@@ -58,10 +58,10 @@ namespace gles
     {
         glLinkProgram(handle_);
 
-        GLint linked;
-        glGetProgramiv(handle_, GL_LINK_STATUS, &linked);
+        GLint status;
+        glGetProgramiv(handle_, GL_LINK_STATUS, &status);
 
-        if (!linked)
+        if (!status)
         {
             int info_log_length, chars_written;
             glGetProgramiv(handle_, GL_INFO_LOG_LENGTH, &info_log_length);
@@ -74,6 +74,12 @@ namespace gles
 
             throw gles_exception(message);
         }
+
+        glValidateProgram(handle_);
+        glGetProgramiv(handle_, GL_VALIDATE_STATUS, &status);
+
+        if (!status)
+            throw gles_exception("Failed to validate GLSL program");
 
         linked_ = true;
     }
