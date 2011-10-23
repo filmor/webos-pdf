@@ -22,13 +22,12 @@ namespace viewer
 
     static const char vert_shader[] =
         "attribute highp vec4 vertex; \
-         attribute mediump vec4 uv; \
-         /* uniform mediump mat4 modelview_matrix; */\
+         attribute mediump vec2 uv; \
+         uniform mediump mat4 mvp_matrix; \
          varying mediump vec2 tex_coord; \
          void main() \
          { \
-             mediump mat4 modelview_matrix = mat4(1.); \
-             gl_Position = modelview_matrix * vertex; \
+             gl_Position = mvp_matrix * vertex; \
              tex_coord = uv.st; \
          }";
 
@@ -47,18 +46,9 @@ namespace viewer
         : doc_(doc)
     {
         glClearColor(0.0, 0.0, 0.5, 1.0);
-        glEnable(GL_BLEND);
+        // glEnable(GL_BLEND);
 
-        // glEnable(GL_TEXTURE_2D);
-
-        // glViewPort(0, 0, screen->h, screen->w);
-        // glLoadIdentity();
-        // TODO: Get Orientation
-        // TODO: Write Ortho-shader
-        // glOrthof(0, screen->h, screen->w, 0, -1, 1);
-
-        // glMatrixMode(GL_MODELVIEW);
-        // glLoadIdentity();
+        glViewport(0, 0, screen->w, screen->h);
 
         program_.add_frag_shader(frag_shader);
         program_.add_vert_shader(vert_shader);
@@ -66,7 +56,6 @@ namespace viewer
         program_.bind_attrib("vertex", VERTEX_ARRAY);
         program_.bind_attrib("uv", TEXTURE_ARRAY);
 
-        // use() links if this hasn't been done yet
         program_.use();
         
         glGenTextures(1, &texture_);
@@ -91,41 +80,42 @@ namespace viewer
         glTexImage2D(GL_TEXTURE_2D,
                      0, // mipmap level
                      GL_RGBA, // color components
-                     next_power_of_2(page.width()),
-                     next_power_of_2(page.height()),
+                     page.width(),
+                     page.height(),
                      0, // border, must be 0
                      GL_RGBA,
                      GL_UNSIGNED_BYTE, // One byte per component 
-                     0
+                     pix.get_data()
                      );
 
         gles::get_error();
 
-        glTexSubImage2D(GL_TEXTURE_2D,
-                        0, // mipmap level
-                        0, 0, // offset
-                        page.width(),
-                        page.height(),
-                        GL_RGBA,
-                        GL_UNSIGNED_BYTE,
-                        pix.get_data()
-                );
+        const static GLfloat aspect = page.height() / GLfloat(page.width());
 
-
-        static const float vertex_array[] = 
+        // This is not right yet
+        static const GLfloat vertex_array[] = 
             {
-                -1.f, -1.f, 0.f,
-                -1.f, 1.f, 0.f,
-                1.f, -1.f, 0.f,
-                1.f, 1.f, 0.f
+                0.f, 0.f, 0.f,
+                0.f, aspect, 0.f,
+                1.f, 0.f, 0.f,
+                1.f, aspect, 0.f
             };
 
-        static const float texture_array[] =
+        static const GLfloat texture_array[] =
             {
                 0.f, 1.f,
                 0.f, 0.f,
                 1.f, 1.f,
                 1.f, 0.f
+            };
+
+        // Not working at all :/
+        static const GLfloat modelview[] =
+            {
+                1, 0, 0, 0,
+                0, 1, 0, 0,
+                0, 0, 1, 0,
+                0, 0, 0, 1
             };
         
         glEnableVertexAttribArray(VERTEX_ARRAY);
@@ -133,6 +123,10 @@ namespace viewer
 
         glEnableVertexAttribArray(TEXTURE_ARRAY);
         glVertexAttribPointer(TEXTURE_ARRAY, 2, GL_FLOAT, GL_FALSE, 0, &texture_array);
+
+        glUniformMatrix4fv(program_.get_uniform_location("mvp_matrix"), 1,
+                           GL_FALSE, // don't transpose
+                           modelview);
 
         glGenBuffers(1, &vbo_);
         glBindBuffer(GL_ARRAY_BUFFER, vbo_);
