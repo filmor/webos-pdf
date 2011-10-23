@@ -34,14 +34,24 @@ namespace gles
 
         if (!shader_compiled)
         {
-            int info_log_length, chars_written;
+            int info_log_length;
             glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &info_log_length);
 
-            std::string message ("Failed to compile shader: ");
-            message.reserve(message.size() + info_log_length);
+            std::string message ("Failed to compile ");
 
-            glGetShaderInfoLog(shader, info_log_length, &chars_written,
-                               &message[0] + message.size());
+            if (vertex_shader)
+                message += "vertex shader";
+            else
+                message += "fragment shader";
+
+            if (info_log_length)
+            {
+                message += ":\n";
+                message.resize(message.size() + info_log_length);
+
+                glGetShaderInfoLog(shader, info_log_length, 0,
+                                   &message[0] + message.size());
+            }
 
             glDeleteShader(shader);
 

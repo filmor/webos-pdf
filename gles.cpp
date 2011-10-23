@@ -34,50 +34,57 @@ int main (int argc, char** argv)
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_NOPARACHUTE);
     PDL_Init(0);
     
-    SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
-
-    SDL_Surface* screen = SDL_SetVideoMode(0, 0, 0, SDL_OPENGL);
-
-    gles_drawer draw(*doc, screen);
-
-    SDL_Event event;
-    do
+    try 
     {
-        draw();
+        SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 
-        bool got_event = false;
-        if (paused)
-        {
-            SDL_WaitEvent(&event);
-            got_event = true;
-        }
-        else
-        {
-            got_event = SDL_PollEvent(&event);
-        }
+        SDL_Surface* screen = SDL_SetVideoMode(0, 0, 0, SDL_OPENGL);
 
-        while (got_event)
+        gles_drawer draw(*doc, screen);
+
+        SDL_Event event;
+        do
         {
-            switch (event.type)
+            draw();
+
+            bool got_event = false;
+            if (paused)
             {
-            case SDL_KEYDOWN:
-                break;
-
-            case SDL_ACTIVEEVENT:
-                if (event.active.state == SDL_APPACTIVE)
-                {
-                    paused = !event.active.gain;
-                }
-                break;
-
-            case SDL_QUIT:
-                running = false;
-                break;
+                SDL_WaitEvent(&event);
+                got_event = true;
             }
-            got_event = SDL_PollEvent(&event);
+            else
+            {
+                got_event = SDL_PollEvent(&event);
+            }
+
+            while (got_event)
+            {
+                switch (event.type)
+                {
+                case SDL_KEYDOWN:
+                    break;
+
+                case SDL_ACTIVEEVENT:
+                    if (event.active.state == SDL_APPACTIVE)
+                    {
+                        paused = !event.active.gain;
+                    }
+                    break;
+
+                case SDL_QUIT:
+                    running = false;
+                    break;
+                }
+                got_event = SDL_PollEvent(&event);
+            }
         }
+        while (running);
     }
-    while (running);
+    catch (std::exception const& exc)
+    {
+        std::cerr << "Exception during rendering:\n" << exc.what() << std::endl;
+    }
 
     delete doc;
     PDL_Quit();

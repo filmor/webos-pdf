@@ -1,4 +1,5 @@
 #include "gles_drawer.hpp"
+#include "gles/exception.hpp"
 
 #include <GLES2/gl2.h>
 
@@ -19,6 +20,18 @@ namespace viewer
         }
     }
 
+    static const char vert_shader[] =
+        "attribute highp vec4 vertex; \
+         attribute mediump vec4 uv; \
+         /* uniform mediump mat4 modelview_matrix; */\
+         varying mediump vec2 tex_coord; \
+         void main() \
+         { \
+             mediump mat4 modelview_matrix = mat4(1.); \
+             gl_Position = modelview_matrix * vertex; \
+             tex_coord = uv.st; \
+         }";
+
     static const char frag_shader[] =
         "uniform sampler2D texture; \
          varying mediump vec2 tex_coord; \
@@ -27,24 +40,17 @@ namespace viewer
              gl_FragColor = texture2D(texture, tex_coord); \
          }";
 
-    static const char vert_shader[] =
-        "attribute highp vec4 vertex; \
-         attribute mediump vec4 uv; \
-         uniform mediump mat4 modelview_matrix; \
-         varying mediump vec2 tex_coord; \
-         void main() \
-         { \
-             gl_Position = modelview_matrix * vertex; \
-             tex_coord = uv.st; \
-         }";
-
     static const GLint VERTEX_ARRAY = 0;
     static const GLint TEXTURE_ARRAY = 1;
 
     gles_drawer::gles_drawer(pdf_document& doc, SDL_Surface* screen)
         : doc_(doc)
     {
-        glClearColor(0, 0, 0, 0);
+        glClearColor(0.0, 0.0, 0.5, 1.0);
+        glEnable(GL_BLEND);
+
+        // glEnable(GL_TEXTURE_2D);
+
         // glViewPort(0, 0, screen->h, screen->w);
         // glLoadIdentity();
         // TODO: Get Orientation
@@ -63,10 +69,9 @@ namespace viewer
         // use() links if this hasn't been done yet
         program_.use();
         
-        glEnable(GL_TEXTURE_2D);
         glGenTextures(1, &texture_);
 
-        glUniform1i(program_.get_uniform_location("texture"), texture_);
+        glUniform1i(program_.get_uniform_location("texture"), 0);
 
         switch_to_page(0);
     }
@@ -78,36 +83,49 @@ namespace viewer
 
         glBindTexture(GL_TEXTURE_2D, texture_);
 
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
         // TODO: Compress? TouchPad doesn't support PVRTC ...
         // TODO: Mipmaps?
         glTexImage2D(GL_TEXTURE_2D,
                      0, // mipmap level
-                     4, // color components
+                     GL_RGBA, // color components
                      next_power_of_2(page.width()),
                      next_power_of_2(page.height()),
                      0, // border, must be 0
                      GL_RGBA,
                      GL_UNSIGNED_BYTE, // One byte per component 
-                     pix.get_data()
+                     0
                      );
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        gles::get_error();
+
+        glTexSubImage2D(GL_TEXTURE_2D,
+                        0, // mipmap level
+                        0, 0, // offset
+                        page.width(),
+                        page.height(),
+                        GL_RGBA,
+                        GL_UNSIGNED_BYTE,
+                        pix.get_data()
+                );
+
 
         static const float vertex_array[] = 
             {
-                1.f, 0.f, -1.f,
-                0.f, 0.f, -1.f,
-                1.f, 1.f, -1.f,
-                0.f, 1.f, -1.f
+                -1.f, -1.f, 0.f,
+                -1.f, 1.f, 0.f,
+                1.f, -1.f, 0.f,
+                1.f, 1.f, 0.f
             };
 
         static const float texture_array[] =
             {
-                1.f, 0.f,
+                0.f, 1.f,
                 0.f, 0.f,
                 1.f, 1.f,
-                0.f, 1.f
+                1.f, 0.f
             };
         
         glEnableVertexAttribArray(VERTEX_ARRAY);
@@ -134,7 +152,6 @@ namespace viewer
         glBindBuffer(GL_ARRAY_BUFFER, vbo_);
         glClear(GL_COLOR_BUFFER_BIT);
         glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-        glBindBuffer(GL_ARRAY_BUFFER, vbo_);
 
         SDL_GL_SwapBuffers();
     }
