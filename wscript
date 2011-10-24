@@ -42,8 +42,9 @@ def configure(conf):
     conf.env.append_value("INCLUDES_MUPDF", join(MUPDF_PATH, "pdf"))
     conf.env.append_value("STLIBPATH_MUPDF", join(MUPDF_PATH, "build", mode))
     conf.env.append_value("STLIB_MUPDF",
-                          ["mupdf", "fitz", "jbig2dec", "jpeg", "openjpeg", "freetype"]
+                          ["mupdf", "fitz", "jbig2dec", "openjpeg"]
                          )
+    conf.env.append_value("LIB_MUPDF", ["jpeg", "freetype"])
 
     conf.check_boost()
 
