@@ -112,7 +112,7 @@ namespace viewer
 
     void gles_drawer::switch_to_page(std::size_t n)
     {
-        std::cout << "Switching to page " << n << std::endl;
+        std::cout << "Switching to page " << n << "\n";
         pdf_page& page = doc_[n];
         const unsigned zoom_factor = 2;
         pixmap pix = renderer_.render_full(zoom_factor, page);
@@ -121,8 +121,6 @@ namespace viewer
 
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-        gles::get_error();
 
         // TODO: Compress? TouchPad doesn't support PVRTC ...
         glTexImage2D(GL_TEXTURE_2D,
@@ -136,12 +134,7 @@ namespace viewer
                      pix.get_data()
                      );
 
-        gles::get_error();
-
-        const static GLfloat aspect = 1024. / 768.;
-        const static GLfloat page_aspect = page.height() / GLfloat(page.width());
-
-        const float scale = page_aspect * aspect;
+        // const static GLfloat page_aspect = page.height() / GLfloat(page.width());
 
         gles::get_error();
     }

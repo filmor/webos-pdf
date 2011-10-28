@@ -36,7 +36,7 @@ int main (int argc, char** argv)
 
     unsigned current_page = 0;
     
-    // try 
+    try 
     {
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
 
@@ -85,11 +85,11 @@ int main (int argc, char** argv)
         }
         while (running);
     }
-    /*catch (std::exception const& exc)
+    catch (std::exception const& exc)
     {
         std::cerr << "Exception during rendering:\n" << exc.what() << std::endl;
         throw;
-    }*/
+    }
 
     delete doc;
     PDL_Quit();
