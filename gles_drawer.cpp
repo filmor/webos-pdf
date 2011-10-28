@@ -65,8 +65,8 @@ namespace viewer
 
         static const GLfloat modelview[] =
             {
-                1, 0, 0, 0,
-                0, 1, 0, 0,
+                0, 2, 0, 0,
+                2, 0, 0, 0,
                 0, 0, 1, 0,
                 -1, -1, 0, 1
             };
@@ -114,7 +114,8 @@ namespace viewer
     {
         std::cout << "Switching to page " << n << std::endl;
         pdf_page& page = doc_[n];
-        pixmap pix = renderer_.render_full(1.0, page);
+        const unsigned zoom_factor = 2;
+        pixmap pix = renderer_.render_full(zoom_factor, page);
 
         glBindTexture(GL_TEXTURE_2D, textures_[0]);
 
@@ -127,8 +128,8 @@ namespace viewer
         glTexImage2D(GL_TEXTURE_2D,
                      0, // mipmap level
                      GL_RGBA, // color components
-                     page.width(),
-                     page.height(),
+                     page.width() * zoom_factor,
+                     page.height() * zoom_factor,
                      0, // border, must be 0
                      GL_RGBA,
                      GL_UNSIGNED_BYTE, // One byte per component 
