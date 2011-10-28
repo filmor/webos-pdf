@@ -112,7 +112,7 @@ namespace viewer
         {
             // TODO: Check for span->eol and, if that's the case add 1 to offset
             //       and act like there is a ' ' at the end of the line
-            for (std::size_t i = 0; i < span->len; ++i)
+            for (std::size_t i = 0; i < std::size_t(span->len); ++i)
             {
                 // This could be optimised by doing some checking before
                 // starting the loop
