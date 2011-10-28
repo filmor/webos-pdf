@@ -112,4 +112,9 @@ namespace gles
         return glGetUniformLocation(handle_, name.c_str());
     }
 
+    GLint program::get_attrib_location(std::string const& name) const
+    {
+        return glGetAttribLocation(handle_, name.c_str());
+    }
+
 }

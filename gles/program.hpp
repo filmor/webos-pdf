@@ -29,6 +29,7 @@ namespace gles
 
         void bind_attrib(std::string const& name, GLuint index) const;
         GLint get_uniform_location(std::string const& name) const;
+        GLint get_attrib_location(std::string const& name) const;
 
         void link();
         void use();
