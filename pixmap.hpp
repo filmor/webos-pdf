@@ -43,15 +43,10 @@ namespace viewer
                          0);
         }
 
-        void* get_data()
-        {
-            return pix_->samples;
-        }
+        void* get_data() { return pix_->samples; }
 
-        fz_pixmap* get()
-        {
-            return pix_;
-        }
+        // TODO: This should go away!
+        fz_pixmap* get() { return pix_; }
 
     private:
         fz_pixmap* pix_;

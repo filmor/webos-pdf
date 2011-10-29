@@ -25,23 +25,21 @@ namespace viewer
         fz_set_aa_level(level);
     }
 
-    pixmap pixmap_renderer::render_full(float zoom, pdf_page const& page)
+    pixmap pixmap_renderer::render_full(float zoom, pdf_page_ptr page)
     {
-        fz_matrix ctm = fz_translate(0, -int(page.height()));
+        fz_matrix ctm = fz_translate(0, -int(page->height()));
         ctm = fz_concat(ctm, fz_scale(zoom, -zoom));
-        ctm = fz_concat(ctm, fz_rotate(page.rotate()));
+        ctm = fz_concat(ctm, fz_rotate(page->rotate()));
 
-        fz_bbox bbox = page.get_bbox(ctm);
+        fz_bbox bbox = page->get_bbox(ctm);
 
         const std::size_t width = bbox.x1 - bbox.x0;
         const std::size_t height = bbox.y1 - bbox.y0;
         pixmap pix (width, height, colorspace_);
         pix.clear(255);
 
-
-
         fz_device* dev = fz_new_draw_device(glyphcache_, pix.get());
-        page.run(dev, ctm, bbox);
+        page->run(dev, ctm, bbox);
         fz_free_device(dev);
 
         return pix;

@@ -23,10 +23,8 @@ namespace viewer
 
         PDF_TRY(pdf_load_page_tree(xref_), "Could not load page tree");
 
-        const std::size_t page_count = pdf_count_pages(xref_);
-        PDF_TRY(page_count == 0, "Empty document");
-
-        pages_.resize(page_count);
+        page_count_ = pdf_count_pages(xref_);
+        PDF_TRY(page_count_ == 0, "Empty document");
     }
 
     pdf_document::~pdf_document()
@@ -39,40 +37,43 @@ namespace viewer
     {
         for (std::size_t i = page; i < pages(); ++i)
         {
-            pdf_page const& page = (*this)[i];
-            int res = page.find_text(text);
+            // TODO: get only text
+            pdf_page_ptr page = get_page(i);
+            int res = page->find_text(text);
             if (res != -1)
                 return find_result_type(true, i, res);
         }
         return find_result_type(false, 0, 0);
     }
-    
 
-    pdf_page& pdf_document::operator[] (std::size_t index)
+    void pdf_document::age_store (std::size_t age)
     {
-        if (index >= pages_.size())
+        pdf_age_store(xref_->store, age);
+    }
+
+    pdf_page_ptr pdf_document::get_page (std::size_t index)
+    {
+        if (index >= pages())
             throw pdf_exception("Invalid page index");
 
-        if (pages_[index] == 0)
-            pages_[index] = new pdf_page(*this, index);
-
-        return *pages_[index];
+        return pdf_page_ptr(new pdf_page(xref_, index));
     }
 
     std::size_t pdf_document::pages() const
     {
-        return pages_.size();
+        return page_count_;
     }
 
-    pdf_page::pdf_page(pdf_document& doc, std::size_t n) : doc_(doc)
+    pdf_page::pdf_page(pdf_xref* xref, std::size_t n)
     {
-        PDF_TRY(pdf_load_page(&page_, doc.xref_, n),
+        ::pdf_page* page;
+        PDF_TRY(pdf_load_page(&page, xref, n),
                 "Could not load page");
 
         // Create display list
         list_ = fz_new_display_list();
         fz_device* dev = fz_new_list_device(list_);
-        PDF_TRY(pdf_run_page(doc.xref_, page_, dev, fz_identity),
+        PDF_TRY(pdf_run_page(xref, page, dev, fz_identity),
                 "Could not draw page");
         fz_free_device(dev);
 
@@ -80,11 +81,15 @@ namespace viewer
         dev = fz_new_text_device(text_span_);
         fz_execute_display_list(list_, dev, fz_identity, fz_infinite_bbox);
         fz_free_device(dev);
+
+        mediabox_ = page->mediabox;
+        rotate_ = page->rotate;
+        pdf_free_page(page);
     }
 
     fz_bbox pdf_page::get_bbox(fz_matrix const& matrix) const
     {
-        return fz_round_rect(fz_transform_rect(matrix, page_->mediabox));
+        return fz_round_rect(fz_transform_rect(matrix, mediabox_));
     }
 
     void pdf_page::run(fz_device* device, fz_matrix const& matrix,
@@ -95,12 +100,12 @@ namespace viewer
 
     std::size_t pdf_page::height() const
     {
-        return std::abs(page_->mediabox.y1 - page_->mediabox.y0);
+        return std::abs(mediabox_.y1 - mediabox_.y0);
     }
 
     std::size_t pdf_page::width() const
     {
-        return std::abs(page_->mediabox.x1 - page_->mediabox.x0);
+        return std::abs(mediabox_.x1 - mediabox_.x0);
     }
 
     int pdf_page::find_text(std::string const& text, std::size_t start) const
@@ -135,6 +140,5 @@ namespace viewer
     {
         fz_free_text_span(text_span_);
         fz_free_display_list(list_);
-        pdf_free_page(page_);
     }
 }

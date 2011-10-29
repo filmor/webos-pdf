@@ -16,7 +16,7 @@ namespace viewer
         void accelerate() const;
         void set_antialiasing(std::size_t level) const;
 
-        pixmap render_full(float zoom, pdf_page const& page);
+        pixmap render_full(float zoom, pdf_page_ptr page);
 
     private:
         fz_glyph_cache* glyphcache_;

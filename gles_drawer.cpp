@@ -113,7 +113,7 @@ namespace viewer
     void gles_drawer::switch_to_page(std::size_t n)
     {
         std::cout << "Switching to page " << n << "\n";
-        pdf_page& page = doc_[n];
+        pdf_page_ptr page = doc_.get_page(n);
         const unsigned zoom_factor = 2;
         pixmap pix = renderer_.render_full(zoom_factor, page);
 
@@ -126,8 +126,8 @@ namespace viewer
         glTexImage2D(GL_TEXTURE_2D,
                      0, // mipmap level
                      GL_RGBA, // color components
-                     page.width() * zoom_factor,
-                     page.height() * zoom_factor,
+                     page->width() * zoom_factor,
+                     page->height() * zoom_factor,
                      0, // border, must be 0
                      GL_RGBA,
                      GL_UNSIGNED_BYTE, // One byte per component 
@@ -137,6 +137,9 @@ namespace viewer
         // const static GLfloat page_aspect = page.height() / GLfloat(page.width());
 
         gles::get_error();
+
+        doc_.age_store(1);
+        std::cout << "Used memory: " << fz_get_memory_used() / (1 << 20) << "M\n";
     }
 
     gles_drawer::~gles_drawer()
