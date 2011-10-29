@@ -21,9 +21,11 @@ extern "C"
 #include "pdf_document.hpp"
 #include "pixmap_renderer.hpp"
 
+using namespace lector;
+
 pthread_mutex_t mutex;
-viewer::pdf_document* document = 0;
-viewer::pixmap_renderer renderer;
+pdf_document* document = 0;
+pixmap_renderer renderer;
 fz_glyph_cache* glyph_cache = 0;
 
 // <path><prefix><page>-<zoom><suffix>
@@ -48,7 +50,7 @@ PDL_bool do_open(PDL_JSParameters* params)
     try
     {
         std::string filename = PDL_GetJSParamString(params, 1);
-        document = new viewer::pdf_document(filename);
+        document = new pdf_document(filename);
 
         // Generate Unique ID as an md5 of the first kilobyte of the file
         std::ifstream file (filename.c_str());
@@ -63,7 +65,7 @@ PDL_bool do_open(PDL_JSParameters* params)
         // Reuse buffer
         fz_md5_final(&md5, buffer);
 
-        viewer::pdf_page_ptr page = document->get_page(0);
+        pdf_page_ptr page = document->get_page(0);
 
         // Generate hex output
         std::string digest = md5::md5_to_string(buffer + 0, buffer + 16);
@@ -141,7 +143,7 @@ PDL_bool do_render(PDL_JSParameters* params)
             if (::access(filename.c_str(), R_OK) == -1 && errno == ENOENT)
             {
                 syslog(LOG_INFO, "Starting rendering of page %d", i);
-                viewer::pdf_page_ptr page = document->get_page(i);
+                pdf_page_ptr page = document->get_page(i);
                 renderer.render_full(zoom / 100., page).write_png(filename);
             }
             else
@@ -158,11 +160,7 @@ PDL_bool do_render(PDL_JSParameters* params)
             fz_flush_warnings();
             syslog(LOG_INFO, "Done rendering page %d", i);
         }
-        int size = fz_get_memory_used();
         document->age_store(3);
-        syslog(LOG_INFO, "Aged store, memory usage: %d vs. %d",
-                          size / (1 << 20), fz_get_memory_used() / (1 << 20)
-              );
     }
     catch (std::exception const& exc)
     {

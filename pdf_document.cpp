@@ -9,7 +9,7 @@
             throw pdf_exception(error_message); \
     }
 
-namespace viewer
+namespace lector
 {
 
     pdf_document::pdf_document(std::string const& filename,

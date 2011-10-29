@@ -1,7 +1,7 @@
 from os.path import join, basename
 
 VERSION='0.1'
-APPNAME='arxservice'
+APPNAME='lector'
 
 PDK_PATH="/opt/PalmPDK"
 # Relative to build
@@ -60,8 +60,8 @@ def build(bld):
     programs = {
                  "arxservice" :
                     (add_cpp("service", "util/filesystem"), []),
-                 "gles_test" : 
-                    (add_cpp("gles", "gles_drawer", "gles/program"), ["GL"])
+                 "lector" : 
+                    (add_cpp("gles", "renderer", "gles/program"), ["GL"])
                }
 
     for prog, t in programs.items():

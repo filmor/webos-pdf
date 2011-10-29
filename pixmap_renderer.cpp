@@ -5,7 +5,7 @@ extern "C"
 #include <fitz.h>
 }
 
-namespace viewer
+namespace lector
 {
     pixmap_renderer::pixmap_renderer()
         : colorspace_(fz_device_rgb)

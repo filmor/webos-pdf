@@ -1,5 +1,5 @@
-#ifndef GLES_SHADER_HPP
-#define GLES_SHADER_HPP
+#ifndef GLES_PROGRAM_HPP
+#define GLES_PROGRAM_HPP
 
 #include <string>
 #include <vector>
@@ -8,7 +8,7 @@
 namespace gles
 {
 
-    // STUB
+    // TODO: Add functions to actually bind attribute vectors(!) and uniforms
     class program
     {
     public:

@@ -1,10 +1,10 @@
-#ifndef PIXMAP_RENDERER_HPP
-#define PIXMAP_RENDERER_HPP
+#ifndef LECTOR_PIXMAP_RENDERER_HPP
+#define LECTOR_PIXMAP_RENDERER_HPP
 
 #include "pdf_document.hpp"
 #include "pixmap.hpp"
 
-namespace viewer
+namespace lector
 {
 
     class pixmap_renderer

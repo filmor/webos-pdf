@@ -1,53 +1,39 @@
-#include "gles_drawer.hpp"
+#include "renderer.hpp"
 #include "gles/exception.hpp"
 
-#include <GLES2/gl2.h>
 #include <iostream>
+#include <GLES2/gl2.h>
 
-namespace viewer
+namespace lector
 {
-
     namespace
     {
-        inline unsigned next_power_of_2 (unsigned v)
-        {
-            v--;
-            v |= v >> 1;
-            v |= v >> 2;
-            v |= v >> 4;
-            v |= v >> 8;
-            v |= v >> 16;
-            return v + 1;
-        }
+        static const char vert_shader[] =
+            "attribute highp vec4 vertex; \
+             uniform mediump mat4 mvp_matrix; \
+             varying mediump vec2 tex_coord; \
+             void main() \
+             { \
+                 gl_Position = mvp_matrix * vertex; \
+                 tex_coord = vertex.st; \
+             }";
+
+        static const char frag_shader[] =
+            "uniform sampler2D texture; \
+             varying mediump vec2 tex_coord; \
+             void main() \
+             { \
+                 gl_FragColor = texture2D(texture, tex_coord); \
+             }";
     }
 
-    static const char vert_shader[] =
-        "attribute highp vec4 vertex; \
-         uniform mediump mat4 mvp_matrix; \
-         varying mediump vec2 tex_coord; \
-         void main() \
-         { \
-             gl_Position = mvp_matrix * vertex; \
-             tex_coord = vertex.st; \
-         }";
-
-    static const char frag_shader[] =
-        "uniform sampler2D texture; \
-         varying mediump vec2 tex_coord; \
-         void main() \
-         { \
-             gl_FragColor = texture2D(texture, tex_coord); \
-         }";
-
-    gles_drawer::gles_drawer(pdf_document& doc, SDL_Surface* screen)
+    renderer::renderer(pdf_document& doc, std::size_t width, std::size_t height)
         : doc_(doc)
     {
         glClearColor(0.0, 0.0, 0.5, 1.0);
-        // glEnable(GL_BLEND);
 
-        glViewport(0, 0, screen->w, screen->h);
-
-        std::cout << "Width: " << screen->w << "\nHeight: " << screen->h << std::endl;
+        // TODO: Add resize member function
+        glViewport(0, 0, width, height);
 
         program_.add_frag_shader(frag_shader);
         program_.add_vert_shader(vert_shader);
@@ -61,7 +47,6 @@ namespace viewer
         // TODO: We need three textures: Previous, next and current
         // Set to GL_TEXTURE_0
         glUniform1i(program_.get_uniform_location("texture"), 0);
-        // glUniform1f(program_.get_uniform_location("aspect"), screen->w / float(screen->h));
 
         static const GLfloat modelview[] =
             {
@@ -110,7 +95,7 @@ namespace viewer
         switch_to_page(0);
     }
 
-    void gles_drawer::switch_to_page(std::size_t n)
+    void renderer::switch_to_page(std::size_t n)
     {
         std::cout << "Switching to page " << n << "\n";
         pdf_page_ptr page = doc_.get_page(n);
@@ -139,24 +124,21 @@ namespace viewer
         gles::get_error();
 
         doc_.age_store(1);
-        std::cout << "Used memory: " << fz_get_memory_used() / (1 << 20) << "M\n";
     }
 
-    gles_drawer::~gles_drawer()
+    renderer::~renderer()
     {
         glDeleteBuffers(2, vbos_);
         glDeleteTextures(3, textures_);
     }
 
-    void gles_drawer::operator() ()
+    void renderer::draw_frame()
     {
         glClear(GL_COLOR_BUFFER_BIT);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos_[1]);
         glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
 
         gles::get_error();
-
-        SDL_GL_SwapBuffers();
     }
 
 

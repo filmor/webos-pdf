@@ -1,24 +1,22 @@
-#ifndef GLES_DRAWER_HPP
-#define GLES_DRAWER_HPP
+#ifndef LECTOR_RENDERER_HPP
+#define LECTOR_RENDERER_HPP
 
 #include <vector>
-
-#include <SDL.h>
 
 #include "pdf_document.hpp"
 #include "pixmap_renderer.hpp"
 #include "gles/program.hpp"
 
-namespace viewer
+namespace lector
 {
 
-    class gles_drawer
+    class renderer
     {
     public:
-        gles_drawer (pdf_document&, SDL_Surface*);
-        ~gles_drawer ();
+        renderer(pdf_document&, std::size_t width, std::size_t height);
+        ~renderer();
 
-        void operator()();
+        void draw_frame();
 
         void switch_to_page(std::size_t n);
 

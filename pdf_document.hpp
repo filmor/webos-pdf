@@ -14,7 +14,7 @@ extern "C"
 #include <mupdf.h>
 }
 
-namespace viewer
+namespace lector
 {
 
     struct pdf_exception : std::runtime_error

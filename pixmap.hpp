@@ -1,12 +1,12 @@
-#ifndef PIXMAP_HPP
-#define PIXMAP_HPP
+#ifndef LECTOR_PIXMAP_HPP
+#define LECTOR_PIXMAP_HPP
 
 extern "C"
 {
 #include <fitz.h>
 }
 
-namespace viewer
+namespace lector
 {
 
     // Thin wrapper around fz_pixmap

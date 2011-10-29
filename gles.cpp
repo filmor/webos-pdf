@@ -6,9 +6,9 @@
 #include <GLES2/gl2.h>
 
 #include "pdf_document.hpp"
-#include "gles_drawer.hpp"
+#include "renderer.hpp"
 
-using namespace viewer;
+using namespace lector;
 
 int main (int argc, char** argv)
 {
@@ -42,12 +42,12 @@ int main (int argc, char** argv)
 
         SDL_Surface* screen = SDL_SetVideoMode(0, 0, 0, SDL_OPENGL);
 
-        gles_drawer draw(*doc, screen);
+        lector::renderer renderer(*doc, screen->w, screen->h);
 
         SDL_Event event;
         do
         {
-            draw();
+            renderer.draw_frame();
 
             bool got_event = false;
             if (paused)
@@ -66,7 +66,7 @@ int main (int argc, char** argv)
                 {
                 case SDL_MOUSEBUTTONDOWN:
                     current_page = (current_page + 1) % doc->pages();
-                    draw.switch_to_page(current_page);
+                    renderer.switch_to_page(current_page);
                     break;
 
                 case SDL_ACTIVEEVENT:
@@ -82,6 +82,8 @@ int main (int argc, char** argv)
                 }
                 got_event = SDL_PollEvent(&event);
             }
+
+            SDL_GL_SwapBuffers();
         }
         while (running);
     }
