@@ -107,19 +107,16 @@ namespace lector
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-        // TODO: Compress? TouchPad doesn't support PVRTC ...
         glTexImage2D(GL_TEXTURE_2D,
                      0, // mipmap level
                      GL_RGBA, // color components
-                     page->width() * zoom_factor,
-                     page->height() * zoom_factor,
+                     pix.width(),
+                     pix.height(),
                      0, // border, must be 0
                      GL_RGBA,
                      GL_UNSIGNED_BYTE, // One byte per component 
                      pix.get_data()
                      );
-
-        // const static GLfloat page_aspect = page.height() / GLfloat(page.width());
 
         gles::get_error();
 

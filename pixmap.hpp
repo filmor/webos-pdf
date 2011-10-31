@@ -13,9 +13,8 @@ namespace lector
     class pixmap
     {
     public:
-        pixmap(std::size_t width, std::size_t height,
-               fz_colorspace* colorspace = fz_device_rgb)
-            : pix_(fz_new_pixmap(colorspace, width, height))
+        pixmap(fz_bbox const& bbox, fz_colorspace* colorspace = fz_device_rgb)
+            : pix_(fz_new_pixmap_with_rect(colorspace, bbox))
         {}
 
         pixmap(pixmap const& pix)
@@ -47,6 +46,9 @@ namespace lector
 
         // TODO: This should go away!
         fz_pixmap* get() { return pix_; }
+
+        std::size_t width() const { return pix_->w; }
+        std::size_t height() const { return pix_->h; }
 
     private:
         fz_pixmap* pix_;

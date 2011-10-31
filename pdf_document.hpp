@@ -60,6 +60,8 @@ namespace lector
         std::size_t height() const;
         std::size_t width() const;
         fz_bbox get_bbox(fz_matrix const& matrix) const;
+        fz_rect const& mediabox() const { return mediabox_; }
+
         int rotate() const { return rotate_; }
 
         void run(fz_device* device, fz_matrix const& matrix,
