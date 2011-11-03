@@ -25,8 +25,10 @@ def configure(conf):
     # SDL
     conf.env.append_value("INCLUDES_SDL", join(PDK_PATH, "include", "SDL"))
     conf.env.append_value("LIBPATH_SDL", join(PDK_PATH, "device", "lib"))
-    conf.env.append_value("DEFINES_SDL", ["_GNU_SOURCE=1", "_REENTRANT"])
+    conf.env.append_value("DEFINES_SDL", ["_GNU_SOURCE=1"])
     conf.env.append_value("LIB_SDL", ["SDL", "pthread"])
+    conf.env.append_value("CXXFLAGS_SDL", ["-pthread"])
+    conf.env.append_value("LINKFLAGS_SDL", ["-pthread"])
 
     # GL
     conf.env.append_value("INCLUDES_GL", join(PDK_PATH, "include"))
