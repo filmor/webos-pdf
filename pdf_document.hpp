@@ -39,6 +39,10 @@ namespace lector
         find_result_type
             find_next(std::string const& text, std::size_t page);
 
+        std::size_t get_page_number(pdf_link* link);
+
+        pdf_outline* get_outline();
+
         void age_store (std::size_t age);
         pdf_page_ptr get_page (std::size_t index);
         std::size_t pages() const;

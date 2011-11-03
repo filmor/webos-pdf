@@ -97,9 +97,60 @@ PDL_bool do_cover(PDL_JSParameters* params)
     return PDL_TRUE;
 }
 
+const boost::format toc_response ("{\"toc\":[%s]}");
+const boost::format toc_element ("{\"p\":%d,\"l\":%d,\"c\":\"%s\"},");
+// p: Page
+// l: Level
+// c: Content (aka Name)
+namespace
+{
+    void print_outline(std::string& str, pdf_outline* out, unsigned level)
+    {
+        while (out)
+        {
+            if (out->link->kind == PDF_LINK_GOTO)
+            {
+                const std::size_t page = document->get_page_number(out->link);
+
+                str += (boost::format(toc_element) % page
+                                                   % level
+                                                   % out->title).str();
+            }
+
+            if (out->child)
+                print_outline(str, out->child, level + 1);            
+            out = out->next;
+        }
+    }
+}
+
 PDL_bool do_toc(PDL_JSParameters* params)
 {
-    // STUB!
+    std::string out;
+
+    if (pthread_mutex_trylock(&mutex))
+    {
+        PDL_JSException(params, "worker thread busy");
+        return PDL_FALSE;
+    }
+
+    try
+    {
+        // TODO: C++ize
+        pdf_outline* outline = document->get_outline();
+        print_outline(out, outline, 0);
+        // pdf_free_outline(outline);
+    }
+    catch (...)
+    {}
+
+    pthread_mutex_unlock(&mutex);
+
+    std::string const& result = (boost::format(toc_response) % out).str();
+    const char* ptr = result.c_str();
+    syslog(LOG_ERR, ptr);
+    PDL_CallJS("TocCallback", &ptr, 1);
+
     return PDL_TRUE;
 }
 
@@ -109,7 +160,6 @@ const boost::format render_response
 PDL_bool do_render(PDL_JSParameters* params)
 {
     PDL_bool return_value = PDL_TRUE;
-
 
     boost::format my_formatter(filename_format);
 
