@@ -1,6 +1,5 @@
 #include <fstream>
 
-#include <pthread.h>
 #include <syslog.h>
 // mkdir, move to filesystem.hpp
 #include <sys/stat.h>
@@ -15,6 +14,7 @@ extern "C"
 }
 
 #include <boost/format.hpp>
+#include <boost/thread.hpp>
 
 #include "util/md5_to_string.hpp"
 #include "util/filesystem.hpp"
@@ -23,10 +23,17 @@ extern "C"
 
 using namespace lector;
 
-pthread_mutex_t mutex;
+typedef boost::mutex mutex_type;
+typedef mutex_type::scoped_try_lock scoped_try_lock;
+typedef mutex_type::scoped_lock scoped_lock;
+typedef boost::shared_lock<mutex_type> shared_lock;
+
+// Globals :/
+boost::thread_group render_threads;
+boost::mutex mutex;
 pdf_document* document = 0;
+
 pixmap_renderer renderer;
-fz_glyph_cache* glyph_cache = 0;
 
 // <path><prefix><page>-<zoom><suffix>
 const boost::format filename_format ("%1$s%2$s%5$04d-%3$03d%4$s");
@@ -34,6 +41,7 @@ const boost::format error ("{\"error\":\"%s\"");
 
 namespace service
 {
+
 PDL_bool do_shell(PDL_JSParameters* params)
 {
     // STUB!
@@ -46,10 +54,12 @@ const boost::format open_response
 PDL_bool do_open(PDL_JSParameters* params)
 {
     std::string r = "";
-    pthread_mutex_lock(&mutex);
+
     try
     {
         std::string filename = PDL_GetJSParamString(params, 1);
+
+        scoped_lock lock(mutex);
         document = new pdf_document(filename);
 
         // Generate Unique ID as an md5 of the first kilobyte of the file
@@ -79,11 +89,6 @@ PDL_bool do_open(PDL_JSParameters* params)
     {
         r = (boost::format(error) % exc.what()).str();
     }
-    catch (...)
-    {
-        r = (boost::format(error) % "Unknown error").str();
-    }
-    pthread_mutex_unlock(&mutex);
 
     const char* ptr = r.c_str();
 
@@ -128,27 +133,21 @@ PDL_bool do_toc(PDL_JSParameters* params)
 {
     std::string out;
 
-    if (pthread_mutex_trylock(&mutex))
+    scoped_try_lock lock (mutex);
+
+    if (!lock.owns_lock())
     {
         PDL_JSException(params, "worker thread busy");
         return PDL_FALSE;
     }
 
-    try
-    {
-        // TODO: C++ize
-        pdf_outline* outline = document->get_outline();
-        print_outline(out, outline, 0);
-        // pdf_free_outline(outline);
-    }
-    catch (...)
-    {}
-
-    pthread_mutex_unlock(&mutex);
+    // TODO: C++ize
+    pdf_outline* outline = document->get_outline();
+    print_outline(out, outline, 0);
+    // pdf_free_outline(outline);
 
     std::string const& result = (boost::format(toc_response) % out).str();
     const char* ptr = result.c_str();
-    syslog(LOG_ERR, ptr);
     PDL_CallJS("TocCallback", &ptr, 1);
 
     return PDL_TRUE;
@@ -156,6 +155,26 @@ PDL_bool do_toc(PDL_JSParameters* params)
 
 const boost::format render_response
     ("{\"from\":%d,\"image\":\"%s\"}");
+
+namespace
+{
+    void render_png(float zoom, pdf_page_ptr page, std::string const& filename,
+                    int i)
+    {
+        {
+            scoped_lock lock(mutex);
+            renderer.render_full(zoom, page).write_png(filename);
+        }
+
+        std::string response_json =
+            (boost::format(render_response) % i % filename).str();
+
+        const char* response = response_json.c_str();
+
+        PDL_CallJS("RenderCallback", &response, 1);
+        syslog(LOG_INFO, "Done rendering page %d", i);
+    }
+}
 
 PDL_bool do_render(PDL_JSParameters* params)
 {
@@ -172,56 +191,44 @@ PDL_bool do_render(PDL_JSParameters* params)
 
     my_formatter % directory % prefix % zoom % suffix;
 
-    if (pthread_mutex_trylock(&mutex))
+    scoped_try_lock lock (mutex);
+    if (!lock.owns_lock())
     {
         PDL_JSException(params, "worker thread busy");
         return PDL_FALSE;
     }
-    try
+
+    if (!document)
+        throw std::runtime_error("Document has not been opened yet");
+
+    document->age_store(3);
+
+    int err = ::mkdir(directory.c_str(), 0755);
+    if (err != 0 && errno != EEXIST)
+        throw std::runtime_error("could not create directory");
+
+    for (int i = from; i < from + count; ++i)
     {
-        if (!document)
-            throw std::runtime_error("Document has not been opened yet");
+        std::string filename = (boost::format(my_formatter) % i).str();
 
-        int err = ::mkdir(directory.c_str(), 0755);
-        if (err != 0 && errno != EEXIST)
-            throw std::runtime_error("could not create directory");
-
-        for (int i = from; i < from + count; ++i)
+        if (::access(filename.c_str(), R_OK) == -1 && errno == ENOENT)
         {
-            std::string filename = (boost::format(my_formatter) % i).str();
-
-            if (::access(filename.c_str(), R_OK) == -1 && errno == ENOENT)
-            {
-                syslog(LOG_INFO, "Starting rendering of page %d", i);
-                pdf_page_ptr page = document->get_page(i);
-                renderer.render_full(zoom / 100., page).write_png(filename);
-            }
-            else
-            {
-                syslog(LOG_INFO, "Reusing cached image of page %d", i);
-            }
-
+            syslog(LOG_INFO, "Starting rendering of page %d", i);
+            pdf_page_ptr page = document->get_page(i);
+            render_threads.add_thread(
+                    new boost::thread(render_png, zoom / 100., page, filename, i)
+                    );
+        }
+        else
+        {
+            syslog(LOG_INFO, "Reusing cached image of page %d", i);
             std::string response_json =
                 (boost::format(render_response) % i % filename).str();
 
             const char* response = response_json.c_str();
-
             PDL_CallJS("RenderCallback", &response, 1);
-            fz_flush_warnings();
-            syslog(LOG_INFO, "Done rendering page %d", i);
         }
-        document->age_store(3);
     }
-    catch (std::exception const& exc)
-    {
-        PDL_JSException(params, exc.what());
-        return_value = PDL_FALSE;
-    }
-    catch (...)
-    {
-        return_value = PDL_FALSE;
-    }
-    pthread_mutex_unlock(&mutex);
 
     return return_value;
 }
@@ -265,9 +272,14 @@ PDL_bool handler(PDL_JSParameters* params)
 #define IF_TYPE(name, n)                                        \
     if (type == #name)                                          \
         if (argc == n+1)                                        \
-            return_value = service::do_##name(params);\
+            return_value = service::do_##name(params);          \
         else                                                    \
-            return_value = PDL_FALSE;
+        {                                                       \
+            PDL_JSException(params,                             \
+                    ("Invalid parameter count for function "    \
+                     + type).c_str());                          \
+            return_value = PDL_FALSE;                           \
+        }
 
 #define ELSE_TYPE(name, n)                                      \
     else IF_TYPE(name, n)
@@ -304,11 +316,8 @@ int main()
     SDL_Init(SDL_INIT_VIDEO);
     PDL_Init(0);
 
-    glyph_cache = fz_new_glyph_cache();
     fz_accelerate();
     fz_set_aa_level(8);
-
-    pthread_mutex_init(&mutex, 0);
 
     PDL_RegisterJSHandler("Handler", &handler);
     PDL_JSRegistrationComplete();
@@ -323,10 +332,9 @@ int main()
     }
     while (event.type != SDL_QUIT);
 
-    pthread_mutex_destroy(&mutex);
+    render_threads.join_all();
 
-    fz_free_glyph_cache(glyph_cache);
-
+    scoped_lock lock (mutex);
     if (document)
         delete document;
 

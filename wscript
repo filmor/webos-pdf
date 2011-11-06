@@ -54,7 +54,12 @@ def build(bld):
     # TODO: Proper dependencies
     add_cpp = lambda *args: [ i + ".cpp" for i in args ]
 
-    common = add_cpp("pdf_document", "pdf_page", "pixmap_renderer")
+    boost_thread = [ "boost_thread/" + i
+                     for i in add_cpp("once", "thread", "tss_null")
+                   ]
+    common = boost_thread \
+             + add_cpp("pdf_document", "pdf_page", "pixmap_renderer")
+
     bld.objects(source = common,
             use = "MUPDF FITZ BOOST SDL PDK", target = "common"
             )
