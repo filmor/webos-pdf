@@ -174,12 +174,66 @@ namespace
         PDL_CallJS("RenderCallback", &response, 1);
         syslog(LOG_INFO, "Done rendering page %d", i);
     }
+
+    void render_loop(float zoom, int from, int count, std::string directory,
+                     boost::format format)
+    {
+        int err = ::mkdir(directory.c_str(), 0755);
+        if (err != 0 && errno != EEXIST)
+            throw std::runtime_error("could not create directory");
+
+        for (int i = from; i < from + count; ++i)
+        {
+            std::string filename = (boost::format(format) % i).str();
+
+            if (::access(filename.c_str(), R_OK) == -1 && errno == ENOENT)
+            {
+                syslog(LOG_INFO, "Starting rendering of page %d", i);
+                pdf_page_ptr page;
+
+                {
+                    scoped_lock lock(mutex);
+                    page = document->get_page(i);
+                }
+
+                // Don't need a seperate thread for small zoomlevels
+                render_png(zoom / 100., page, filename, i);
+                /*if (zoom < 200.)
+                    render_png(zoom / 100., page, filename, i);
+                else
+                    render_threads.add_thread(
+                        new boost::thread(render_png, zoom / 100., page, filename, i)
+                        );*/
+
+                {
+                    scoped_lock lock(mutex);
+                    page.reset();
+                }
+            }
+            else
+            {
+                syslog(LOG_INFO, "Reusing cached image of page %d", i);
+                std::string response_json =
+                    (boost::format(render_response) % i % filename).str();
+
+                const char* response = response_json.c_str();
+                PDL_CallJS("RenderCallback", &response, 1);
+            }
+        }
+        // Age store afterwards. This should be done in a nicer or more rigorous
+        // way …
+        scoped_lock lock(mutex);
+
+        int memory_before = fz_get_memory_used();
+        document->age_store(3);
+        int memory_after = fz_get_memory_used();
+        syslog(LOG_INFO, "Aged storage: %d vs. %d", memory_before >> 20
+                                                  , memory_after >> 20);
+    }
 }
 
 PDL_bool do_render(PDL_JSParameters* params)
 {
-    PDL_bool return_value = PDL_TRUE;
-
     boost::format my_formatter(filename_format);
 
     int from = PDL_GetJSParamInt(params, 1);
@@ -191,46 +245,15 @@ PDL_bool do_render(PDL_JSParameters* params)
 
     my_formatter % directory % prefix % zoom % suffix;
 
-    scoped_try_lock lock (mutex);
-    if (!lock.owns_lock())
-    {
-        PDL_JSException(params, "worker thread busy");
-        return PDL_FALSE;
-    }
-
     if (!document)
         throw std::runtime_error("Document has not been opened yet");
 
-    document->age_store(3);
+    render_threads.add_thread(
+            new boost::thread(render_loop, zoom, from, count, directory,
+                              my_formatter)
+    );
 
-    int err = ::mkdir(directory.c_str(), 0755);
-    if (err != 0 && errno != EEXIST)
-        throw std::runtime_error("could not create directory");
-
-    for (int i = from; i < from + count; ++i)
-    {
-        std::string filename = (boost::format(my_formatter) % i).str();
-
-        if (::access(filename.c_str(), R_OK) == -1 && errno == ENOENT)
-        {
-            syslog(LOG_INFO, "Starting rendering of page %d", i);
-            pdf_page_ptr page = document->get_page(i);
-            render_threads.add_thread(
-                    new boost::thread(render_png, zoom / 100., page, filename, i)
-                    );
-        }
-        else
-        {
-            syslog(LOG_INFO, "Reusing cached image of page %d", i);
-            std::string response_json =
-                (boost::format(render_response) % i % filename).str();
-
-            const char* response = response_json.c_str();
-            PDL_CallJS("RenderCallback", &response, 1);
-        }
-    }
-
-    return return_value;
+    return PDL_TRUE;
 }
 
 PDL_bool do_delete(PDL_JSParameters* params)
@@ -304,6 +327,10 @@ PDL_bool handler(PDL_JSParameters* params)
     {
         return_value = PDL_FALSE;
     }
+
+    if (int count = fz_get_error_count())
+        for (int i = 0; i < count; ++i)
+            syslog(LOG_INFO, "Fitz error: %s", fz_get_error_line(i));
 
     return return_value;
 }
