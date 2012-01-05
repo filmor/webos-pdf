@@ -12,16 +12,19 @@
 namespace lector
 {
 
-    pdf_document::pdf_document(std::string const& filename,
+    pdf_document::pdf_document(fz_context* ctx,
+                               std::string const& filename,
                                std::string const& password)
     {
-        PDF_TRY(pdf_open_xref(&xref_,
+        context_ = ctx;
+        xref_ = pdf_open_xref(context_,
                     const_cast<char*> (filename.c_str()),
                     const_cast<char*> (password.c_str())
-                ),
-                "Could not open document");
+                );
 
-        PDF_TRY(pdf_load_page_tree(xref_), "Could not load page tree");
+        PDF_TRY(int(xref_), "Could not open document");
+
+        pdf_load_page_tree(xref_);
 
         page_count_ = pdf_count_pages(xref_);
         PDF_TRY(page_count_ == 0, "Empty document");
@@ -46,11 +49,6 @@ namespace lector
         return find_result_type(false, 0, 0);
     }
 
-    void pdf_document::age_store (std::size_t age)
-    {
-        pdf_age_store(xref_->store, age);
-    }
-
     pdf_page_ptr pdf_document::get_page (std::size_t index)
     {
         if (index >= pages())
@@ -59,19 +57,11 @@ namespace lector
         return pdf_page_ptr(new pdf_page(xref_, index));
     }
 
-    pdf_outline* pdf_document::get_outline()
+    fz_outline* pdf_document::get_outline()
     {
         return pdf_load_outline(xref_);
     }
     
-    std::size_t pdf_document::get_page_number(pdf_link* link)
-    {
-        if (link->kind == PDF_LINK_GOTO)
-            return pdf_find_page_number(xref_, fz_array_get(link->dest, 0));
-        else
-            return 0;
-    }
-
     std::size_t pdf_document::pages() const
     {
         return page_count_;

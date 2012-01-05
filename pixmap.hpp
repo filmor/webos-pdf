@@ -13,17 +13,20 @@ namespace lector
     class pixmap
     {
     public:
-        pixmap(fz_bbox const& bbox, fz_colorspace* colorspace = fz_device_rgb)
-            : pix_(fz_new_pixmap_with_rect(colorspace, bbox))
+        pixmap(fz_context* ctx, fz_bbox const& bbox,
+               fz_colorspace* colorspace = fz_device_rgb)
+            : ctx_(ctx),
+              pix_(fz_new_pixmap_with_rect(ctx, colorspace, bbox))
         {}
 
         pixmap(pixmap const& pix)
-            : pix_(fz_keep_pixmap(pix.pix_))
+            : ctx_(pix.ctx_),
+              pix_(fz_keep_pixmap(pix.pix_))
         {}
 
         ~pixmap()
         {
-            fz_drop_pixmap(pix_);
+            fz_drop_pixmap(ctx_, pix_);
         }
 
         void clear(std::size_t color = 0xFF)
@@ -37,7 +40,8 @@ namespace lector
         void write_png(std::string const& str) const
         {
             // TODO: Error handling, Alpha channel
-            fz_write_png(const_cast<fz_pixmap*> (pix_),
+            fz_write_png(ctx_,
+                         const_cast<fz_pixmap*> (pix_),
                          const_cast<char*> (str.c_str()),
                          0);
         }
@@ -51,6 +55,7 @@ namespace lector
         std::size_t height() const { return pix_->h; }
 
     private:
+        fz_context* ctx_;
         fz_pixmap* pix_;
     };
 

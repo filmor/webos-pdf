@@ -32,23 +32,22 @@ namespace lector
         typedef std::tuple<bool, std::size_t, std::size_t> find_result_type;
 
         // TODO Use streams
-        pdf_document(std::string const& filename,
+        pdf_document(fz_context* ctx,
+                     std::string const& filename,
                      std::string const& password = "");
         ~pdf_document();
 
         find_result_type
             find_next(std::string const& text, std::size_t page);
 
-        std::size_t get_page_number(pdf_link* link);
+        fz_outline* get_outline();
 
-        pdf_outline* get_outline();
-
-        void age_store (std::size_t age);
         pdf_page_ptr get_page (std::size_t index);
         std::size_t pages() const;
 
     private:
         pdf_xref* xref_;
+        fz_context* context_;
         std::size_t page_count_;
     };
 

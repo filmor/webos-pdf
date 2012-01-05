@@ -32,8 +32,9 @@ typedef boost::shared_lock<mutex_type> shared_lock;
 boost::thread_group render_threads;
 boost::mutex mutex;
 pdf_document* document = 0;
+fz_context* context = fz_new_context(&fz_alloc_default, 512 << 20);
 
-pixmap_renderer renderer;
+pixmap_renderer renderer(context);
 
 // <path><prefix><page>-<zoom><suffix>
 const boost::format filename_format ("%1$s%2$s%5$04d-%3$03d%4$s");
@@ -60,7 +61,7 @@ PDL_bool do_open(PDL_JSParameters* params)
         std::string filename = PDL_GetJSParamString(params, 1);
 
         scoped_lock lock(mutex);
-        document = new pdf_document(filename);
+        document = new pdf_document(context, filename);
 
         // Generate Unique ID as an md5 of the first kilobyte of the file
         std::ifstream file (filename.c_str());
@@ -109,21 +110,21 @@ const boost::format toc_element ("{\"p\":%d,\"l\":%d,\"c\":\"%s\"},");
 // c: Content (aka Name)
 namespace
 {
-    void print_outline(std::string& str, pdf_outline* out, unsigned level)
+    void print_outline(std::string& str, fz_outline* out, unsigned level)
     {
         while (out)
         {
-            if (out->link->kind == PDF_LINK_GOTO)
+            if (out->dest.kind == FZ_LINK_GOTO)
             {
-                const std::size_t page = document->get_page_number(out->link);
+                const std::size_t page = out->dest.ld.gotor.page;
 
                 str += (boost::format(toc_element) % page
                                                    % level
                                                    % out->title).str();
             }
 
-            if (out->child)
-                print_outline(str, out->child, level + 1);            
+            if (out->down)
+                print_outline(str, out->down, level + 1);            
             out = out->next;
         }
     }
@@ -142,9 +143,9 @@ PDL_bool do_toc(PDL_JSParameters* params)
     }
 
     // TODO: C++ize
-    pdf_outline* outline = document->get_outline();
+    fz_outline* outline = document->get_outline();
     print_outline(out, outline, 0);
-    // pdf_free_outline(outline);
+    // fz_free_outline(outline);
 
     std::string const& result = (boost::format(toc_response) % out).str();
     const char* ptr = result.c_str();
@@ -223,12 +224,6 @@ namespace
         // Age store afterwards. This should be done in a nicer or more rigorous
         // way …
         scoped_lock lock(mutex);
-
-        int memory_before = fz_get_memory_used();
-        document->age_store(3);
-        int memory_after = fz_get_memory_used();
-        syslog(LOG_INFO, "Aged storage: %d vs. %d", memory_before >> 20
-                                                  , memory_after >> 20);
     }
 }
 
@@ -328,10 +323,6 @@ PDL_bool handler(PDL_JSParameters* params)
         return_value = PDL_FALSE;
     }
 
-    if (int count = fz_get_error_count())
-        for (int i = 0; i < count; ++i)
-            syslog(LOG_INFO, "Fitz error: %s", fz_get_error_line(i));
-
     return return_value;
 }
 
@@ -344,7 +335,7 @@ int main()
     PDL_Init(0);
 
     fz_accelerate();
-    fz_set_aa_level(8);
+    fz_set_aa_level(context, 8);
 
     PDL_RegisterJSHandler("Handler", &handler);
     PDL_JSRegistrationComplete();

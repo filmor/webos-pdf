@@ -10,7 +10,7 @@ namespace lector
     class pixmap_renderer
     {
     public:
-        pixmap_renderer();
+        pixmap_renderer(fz_context*);
         ~pixmap_renderer();
 
         void accelerate() const;
@@ -21,6 +21,7 @@ namespace lector
     private:
         fz_glyph_cache* glyphcache_;
         fz_colorspace* colorspace_;
+        fz_context* ctx_;
     };
 }
 

@@ -7,10 +7,11 @@ extern "C"
 
 namespace lector
 {
-    pixmap_renderer::pixmap_renderer()
-        : colorspace_(fz_device_rgb)
+    pixmap_renderer::pixmap_renderer(fz_context* ctx)
+        : colorspace_(fz_device_rgb),
+          ctx_(ctx)
     {
-        glyphcache_ = fz_new_glyph_cache();
+        glyphcache_ = fz_new_glyph_cache(ctx_);
         set_antialiasing(8);
         accelerate();
     }
@@ -22,7 +23,7 @@ namespace lector
 
     void pixmap_renderer::set_antialiasing(std::size_t level) const
     {
-        fz_set_aa_level(level);
+        fz_set_aa_level(ctx_, level);
     }
 
     pixmap pixmap_renderer::render_full(float zoom, pdf_page_ptr page)
@@ -33,10 +34,10 @@ namespace lector
 
         fz_bbox bbox = page->get_bbox(ctm);
 
-        pixmap pix (bbox, colorspace_);
+        pixmap pix (ctx_, bbox, colorspace_);
         pix.clear(255);
 
-        fz_device* dev = fz_new_draw_device(glyphcache_, pix.get());
+        fz_device* dev = fz_new_draw_device(ctx_, glyphcache_, pix.get());
         page->run(dev, ctm, bbox);
         fz_free_device(dev);
 
@@ -45,7 +46,7 @@ namespace lector
 
     pixmap_renderer::~pixmap_renderer()
     {
-        fz_free_glyph_cache(glyphcache_);
+        fz_free_glyph_cache(ctx_, glyphcache_);
     }
 
 }

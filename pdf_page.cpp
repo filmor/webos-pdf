@@ -13,25 +13,23 @@ namespace lector
 {
     pdf_page::pdf_page(pdf_xref* xref, std::size_t n)
     {
-        ::pdf_page* page;
-        PDF_TRY(pdf_load_page(&page, xref, n),
-                "Could not load page");
+        xref_ = xref;
+        ::pdf_page* page = pdf_load_page(xref, n);
 
         // Create display list
-        list_ = fz_new_display_list();
-        fz_device* dev = fz_new_list_device(list_);
-        PDF_TRY(pdf_run_page(xref, page, dev, fz_identity),
-                "Could not draw page");
+        list_ = fz_new_display_list(xref->ctx);
+        fz_device* dev = fz_new_list_device(xref->ctx, list_);
+        pdf_run_page(xref, page, dev, fz_identity, 0);
         fz_free_device(dev);
 
-        text_span_ = fz_new_text_span();
-        dev = fz_new_text_device(text_span_);
-        fz_execute_display_list(list_, dev, fz_identity, fz_infinite_bbox);
+        text_span_ = fz_new_text_span(xref->ctx);
+        dev = fz_new_text_device(xref->ctx, text_span_);
+        fz_execute_display_list(list_, dev, fz_identity, fz_infinite_bbox, 0);
         fz_free_device(dev);
 
         mediabox_ = page->mediabox;
         rotate_ = page->rotate;
-        pdf_free_page(page);
+        pdf_free_page(xref->ctx, page);
     }
 
     fz_bbox pdf_page::get_bbox(fz_matrix const& matrix) const
@@ -42,7 +40,7 @@ namespace lector
     void pdf_page::run(fz_device* device, fz_matrix const& matrix,
                        fz_bbox const& bbox) const
     {
-        fz_execute_display_list(list_, device, matrix, bbox);
+        fz_execute_display_list(list_, device, matrix, bbox, 0);
     }
 
     std::size_t pdf_page::height() const
@@ -85,8 +83,8 @@ namespace lector
 
     pdf_page::~pdf_page()
     {
-        fz_free_text_span(text_span_);
-        fz_free_display_list(list_);
+        fz_free_text_span(xref_->ctx, text_span_);
+        fz_free_display_list(xref_->ctx, list_);
     }
     
 }
