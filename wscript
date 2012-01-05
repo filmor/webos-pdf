@@ -68,7 +68,8 @@ def build(bld):
                  "arxservice" :
                     (add_cpp("service", "util/filesystem"), []),
                  "lector" : 
-                    (add_cpp("gles", "renderer", "gles/program"), ["GL"])
+                    (add_cpp("gles", "renderer", "scene", "gles/program",
+                             "texture_manager"), ["GL"])
                }
 
     for prog, t in programs.items():
