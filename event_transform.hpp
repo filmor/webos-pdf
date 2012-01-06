@@ -43,8 +43,10 @@ namespace lector
                         (current_time_ - last_pressed_[finger]) < TAP_TIME
                      && (finger_count_ == 1)
                    )
-                    scene_.event(events::tap(x, y));
-                    ;
+                {
+                    events::tap evt = {x, y};
+                    scene_.event(evt);
+                }
 
                 pressed_[finger] = false;
                 --finger_count_;
@@ -58,7 +60,8 @@ namespace lector
             {
                 last_x_ = x;
                 last_y_ = y;
-                scene_.event(events::single_drag(x, y, xrel, yrel));
+                events::single_drag evt = {x, y, xrel, yrel};
+                scene_.event(evt);
             }
 /*            else if (finger == 1)
             {
