@@ -68,7 +68,7 @@ def build(bld):
                  "arxservice" :
                     (add_cpp("service", "util/filesystem"), []),
                  "lector" : 
-                    (add_cpp("gles", "renderer", "scene", "gles/program",
+                    (add_cpp("main", "renderer", "scene", "gles/program",
                              "texture_manager"), ["GL"])
                }
 
