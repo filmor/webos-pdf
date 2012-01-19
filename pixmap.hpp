@@ -21,7 +21,7 @@ namespace lector
 
         pixmap(pixmap const& pix)
             : ctx_(pix.ctx_),
-              pix_(fz_keep_pixmap(pix.pix_))
+              pix_(fz_keep_pixmap(ctx_, pix.pix_))
         {}
 
         ~pixmap()

@@ -58,7 +58,7 @@ def build(bld):
                      for i in add_cpp("once", "thread", "tss_null")
                    ]
     common = boost_thread \
-             + add_cpp("pdf_document", "pdf_page", "pixmap_renderer")
+             + add_cpp("context", "pixmap_renderer")
 
     bld.objects(source = common,
             use = "MUPDF FITZ BOOST SDL PDK", target = "common"
@@ -66,10 +66,12 @@ def build(bld):
 
     programs = {
                  "arxservice" :
-                    (add_cpp("service", "util/filesystem"), []),
-                 "lector" : 
-                    (add_cpp("main", "renderer", "scene", "gles/program",
-                             "texture_manager"), ["GL"])
+                    (add_cpp("service", "util/filesystem",
+                             "service/find", "service/open", "service/saveas",
+                             "service/render", "service/service"), []),
+#                 "lector" : 
+#                    (add_cpp("main", "renderer", "scene", "gles/program",
+#                             "texture_manager"), ["GL"])
                }
 
     for prog, t in programs.items():
