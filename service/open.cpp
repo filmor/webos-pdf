@@ -75,8 +75,7 @@ namespace lector
             // Cache outline string, it will be used directly afterwards.
             print_outline(toc_data_, ctx_.get_outline(), 0);
 
-            ctx_.load_page(0);
-            fz_rect bbox = ctx_.get_bbox();
+            fz_rect bbox = ctx_.get_bbox(0);
 
             // Generate hex output
             std::string digest = md5::md5_to_string(buffer + 0, buffer + 16);

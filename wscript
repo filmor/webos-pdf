@@ -66,7 +66,7 @@ def build(bld):
 
     programs = {
                  "arxservice" :
-                    (add_cpp("service", "util/filesystem",
+                    (add_cpp("arxservice", "util/filesystem",
                              "service/find", "service/open", "service/saveas",
                              "service/render", "service/service"), []),
 #                 "lector" : 

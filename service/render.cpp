@@ -72,8 +72,7 @@ namespace lector
             std::string const& filename = std::get<2>(elem);
             queue_.pop(elem);
             syslog(LOG_INFO, "Got item");
-            ctx.load_page(page);
-            ctx.render_full(zoom).write_png(filename);
+            ctx.render_full(zoom, page).write_png(filename);
 
             std::string response_json =
                 (boost::format(render_response) % page

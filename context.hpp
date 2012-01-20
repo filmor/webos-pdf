@@ -5,6 +5,7 @@
 #include <memory>
 #include <boost/utility.hpp>
 #include <boost/thread/mutex.hpp>
+#include <syslog.h>
 
 extern "C"
 {
@@ -35,6 +36,7 @@ namespace lector
     //       Maybe only merge the first two, pdf_page actually has some use
     //
     // TODO: Rename to draw_context, add a text_context
+    // TODO: Share display lists, generate one per page
     // 
     class context
     {
@@ -48,14 +50,14 @@ namespace lector
 
         void load_file(std::string const& filename);
 
-        void load_page(std::size_t n);
         fz_outline const* get_outline();
 
-        std::size_t get_page_count() const { return page_count_; }
+        std::size_t get_page_count() const;
 
-        fz_rect get_bbox();
-        pixmap render_full(float zoom);
+        fz_rect get_bbox(std::size_t page);
+        pixmap render_full(float zoom, std::size_t page);
 
+        // TODO: Version with return types (in seperate impl header)
         template <typename Func, typename... Args>
         void call (Func func, Args... args)
         {
@@ -65,12 +67,17 @@ namespace lector
             }
             fz_catch(ctx_)
             {
+                syslog(LOG_INFO, "Fitz exception");
                 // Throw C++ exception
             }
         }
 
     private:
-        boost::mutex mutex_;
+        struct shared_data;
+
+        std::shared_ptr<shared_data> data_;
+        std::shared_ptr<boost::mutex> mutex_;
+
         fz_context* ctx_;
         
         pdf_xref* xref_;
