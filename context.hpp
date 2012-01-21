@@ -68,15 +68,32 @@ namespace lector
             fz_catch(ctx_)
             {
                 syslog(LOG_INFO, "Fitz exception");
-                // Throw C++ exception
+                throw fitz_exception("exception");
             }
+        }
+
+        template <typename Return, typename Func, typename... Args>
+        Return call_ret (Func func, Args... args)
+        {
+            Return result;
+            fz_try(ctx_)
+            {
+                result = func(ctx_, args...);
+            }
+            fz_catch(ctx_)
+            {
+                syslog(LOG_INFO, "Fitz exception");
+                throw fitz_exception("");
+            }
+            return result;
         }
 
     private:
         struct shared_data;
 
         std::shared_ptr<shared_data> data_;
-        std::shared_ptr<boost::mutex> mutex_;
+        std::shared_ptr<boost::mutex> fitz_mutex_;
+        std::shared_ptr<boost::mutex> data_mutex_;
 
         fz_context* ctx_;
         

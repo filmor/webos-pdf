@@ -58,7 +58,7 @@ def build(bld):
                      for i in add_cpp("once", "thread", "tss_null")
                    ]
     common = boost_thread \
-             + add_cpp("context", "pixmap_renderer")
+             + add_cpp("context",)
 
     bld.objects(source = common,
             use = "MUPDF FITZ BOOST SDL PDK", target = "common"

@@ -32,10 +32,13 @@ namespace lector
         if (err != 0 && errno != EEXIST)
             throw std::runtime_error("could not create directory");
 
-        syslog(LOG_INFO, "Rendering call");
+        syslog(LOG_INFO, "Rendering call: from %d, count %d", from, count);
         for (int i = from; i < from + count; ++i)
         {
-            std::string filename = (boost::format(filename_format) % i).str();
+            syslog(LOG_INFO, "Entering loop");
+            std::string filename = (boost::format(my_formatter) % i).str();
+
+            syslog(LOG_INFO, "- filename: %s", filename.c_str());
 
             if (::access(filename.c_str(), R_OK) == -1 && errno == ENOENT)
             {
@@ -52,6 +55,7 @@ namespace lector
                 PDL_CallJS("RenderCallback", &response, 1);
             }
         }
+        syslog(LOG_INFO, "Exiting loop");
 
         return PDL_TRUE;
     }
@@ -67,12 +71,22 @@ namespace lector
         while(running_)
         {
             syslog(LOG_INFO, "Rendering task");
+            queue_.pop(elem);
+
             float const& zoom = std::get<0>(elem);
             int const& page = std::get<1>(elem);
             std::string const& filename = std::get<2>(elem);
-            queue_.pop(elem);
             syslog(LOG_INFO, "Got item");
-            ctx.render_full(zoom, page).write_png(filename);
+            try
+            {
+                pixmap pix = ctx.render_full(zoom, page);
+                pix.write_png(filename);
+            }
+            catch (std::runtime_error const& exc)
+            {
+                syslog(LOG_ERR, "Exception: %s", exc.what());
+            }
+            syslog(LOG_INFO, "Rendered successfully");
 
             std::string response_json =
                 (boost::format(render_response) % page
