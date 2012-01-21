@@ -111,7 +111,6 @@ namespace lector
     // TODO: Move this into the constructor
     void context::load_file(std::string const& name)
     {
-        fz_display_list** lists;
         pdf_xref* xref = 0;
 
         fz_try(ctx_)
@@ -123,15 +122,30 @@ namespace lector
             xref = 0;
             throw pdf_exception("Couldn't open PDF file");
         }
-        LECTOR_LOG("Done loading xref");
 
-        // TODO: This does only work if the file doesn't need a password. Do
-        //       this in "authenticate" or an additional private function
+        {
+            LECTOR_LOG_GUARD("Rewriting xref", "Done");
+            boost::mutex::scoped_lock lock(*data_mutex_);
+
+            data_->recycle(ctx_);
+            data_->xref = xref;
+        }
+
+        if (!needs_password())
+            load_display_lists();
+    }
+
+    void context::load_display_lists()
+    {
+        pdf_xref* xref = data_->xref;
+        if (!xref)
+            return;
+
         fz_try(ctx_)
         {
             std::size_t page_count = pdf_count_pages(xref);
 
-            lists = new fz_display_list*[page_count];
+            fz_display_list** lists = new fz_display_list*[page_count];
 
             // Create display lists
             for (unsigned i = 0; i < page_count; ++i)
@@ -156,8 +170,6 @@ namespace lector
                 boost::mutex::scoped_lock lock(*data_mutex_);
 
                 // Atomic write of data_
-                data_->recycle(ctx_);
-                LECTOR_LOG("Recycled successfully");
                 data_->xref = xref;
                 data_->page_count = page_count;
                 data_->lists = lists;
@@ -179,11 +191,17 @@ namespace lector
 
     bool context::authenticate(std::string const& password)
     {
-        if (data_->xref)
-            return pdf_authenticate_password(data_->xref,
-                                             const_cast<char*> (password.c_str()));
-        else
-            return false;
+        LECTOR_LOG_FUNC;
+        bool result = false;
+        if (data_->xref && needs_password())
+        {
+            result = pdf_authenticate_password(data_->xref,
+                                               const_cast<char*> (password.c_str()));
+            if (result)
+                load_display_lists();
+            LECTOR_LOG("Result: %s", result ? "True": "False");
+        }
+        return result;
     }
 
     fz_rect context::get_bbox(std::size_t n)

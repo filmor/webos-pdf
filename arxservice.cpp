@@ -14,9 +14,9 @@ PDL_bool handler(PDL_JSParameters* params)
     std::string type(PDL_GetJSParamString(params, 0));
     LECTOR_LOG("Handler called with mode %s", type.c_str());
 
-#define IF_TYPE(name, n)                                        \
+#define IF_TYPE2(name, n, m)                                        \
     if (type == #name)                                          \
-        if (argc == n+1)                                        \
+        if (argc >= n + 1 && argc <= m + 1)                     \
             return_value = service->do_##name(params);          \
         else                                                    \
         {                                                       \
@@ -26,13 +26,19 @@ PDL_bool handler(PDL_JSParameters* params)
             return_value = PDL_FALSE;                           \
         }
 
-#define ELSE_TYPE(name, n)                                      \
-    else IF_TYPE(name, n)
+#define IF_TYPE(name, n) \
+    IF_TYPE2(name, n, n)
+
+#define ELSE_TYPE2(name, n, m)                                   \
+    else IF_TYPE2(name, n, m)
+
+#define ELSE_TYPE(name, n) \
+    ELSE_TYPE2(name, n, n)
 
     try
     {
         IF_TYPE(shell, 1)
-        ELSE_TYPE(open, 2)
+        ELSE_TYPE2(open, 1, 2)
         ELSE_TYPE(cover, 5)
         ELSE_TYPE(toc, 0)
         ELSE_TYPE(render, 6)

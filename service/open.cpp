@@ -12,7 +12,7 @@ namespace lector
          ",\"dst\":\"/media/internal/appdata/com.quickoffice.ar/.cache/%s\"}");
 
     static const boost::format toc_element ("{\"p\":%d,\"l\":%d,\"c\":\"%s\"},");
-    static const boost::format error ("{\"error\":\"%s\"");
+    static const boost::format error ("{\"error\":\"%s\"}");
 
     // p: Page
     // l: Level
@@ -53,9 +53,10 @@ namespace lector
 
             if (ctx_.needs_password())
             {
+                // TODO: Do this more safely
                 std::string password = PDL_GetJSParamString(params, 2);
                 if (!ctx_.authenticate(password))
-                    throw pdf_exception("PASSWORD WRONG MESSAGE");
+                    throw pdf_exception("password incorrect");
             }
 
             // Generate Unique ID as an md5 of the first kilobyte of the file
@@ -83,20 +84,22 @@ namespace lector
                                               % (bbox.x1 - bbox.x0)
                                               % (bbox.y1 - bbox.y0)
                                               % digest).str();
+
+            for (unsigned i = 0; i < number_of_threads_; ++i)
+                render_threads_.add_thread(
+                        new boost::thread(boost::bind(&service::render_thread, this)
+                            ));
+
+            LECTOR_LOG("Started threads");
         }
         catch (std::exception const& exc)
         {
             r = (boost::format(error) % exc.what()).str();
         }
 
-        for (unsigned i = 0; i < number_of_threads_; ++i)
-            render_threads_.add_thread(
-                    new boost::thread(boost::bind(&service::render_thread, this)
-                        ));
-
-        LECTOR_LOG("Started threads");
-
         const char* ptr = r.c_str();
+
+        LECTOR_LOG("Output: %s", ptr);
 
         PDL_CallJS("OpenCallback", &ptr, 1);
         return PDL_TRUE;

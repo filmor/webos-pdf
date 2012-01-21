@@ -84,6 +84,8 @@ namespace lector
         }
 
     private:
+        void load_display_lists();
+
         struct shared_data;
 
         std::shared_ptr<shared_data> data_;
