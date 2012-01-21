@@ -1,6 +1,6 @@
 #include "service.hpp"
+#include "../log.hpp"
 
-#include <syslog.h>
 #include <sys/stat.h>
 #include <boost/format.hpp>
 
@@ -13,7 +13,6 @@ namespace lector
 
     PDL_bool service::do_render(PDL_JSParameters* params)
     {
-        syslog(LOG_INFO, "Called do_render");
         boost::format my_formatter(filename_format);
 
         int from = PDL_GetJSParamInt(params, 1);
@@ -32,22 +31,19 @@ namespace lector
         if (err != 0 && errno != EEXIST)
             throw std::runtime_error("could not create directory");
 
-        syslog(LOG_INFO, "Rendering call: from %d, count %d", from, count);
+        LECTOR_LOG("Rendering call: from %d, count %d", from, count);
         for (int i = from; i < from + count; ++i)
         {
-            syslog(LOG_INFO, "Entering loop");
             std::string filename = (boost::format(my_formatter) % i).str();
-
-            syslog(LOG_INFO, "- filename: %s", filename.c_str());
 
             if (::access(filename.c_str(), R_OK) == -1 && errno == ENOENT)
             {
-                syslog(LOG_INFO, "Starting rendering of page %d", i);
+                LECTOR_LOG("Starting rendering of page %d", i);
                 queue_.push(std::make_tuple(zoom / 100.f, i, filename));
             }
             else
             {
-                syslog(LOG_INFO, "Reusing cached image of page %d", i);
+                LECTOR_LOG("Reusing cached image of page %d", i);
                 std::string response_json =
                     (boost::format(render_response) % i % filename).str();
 
@@ -55,28 +51,27 @@ namespace lector
                 PDL_CallJS("RenderCallback", &response, 1);
             }
         }
-        syslog(LOG_INFO, "Exiting loop");
 
         return PDL_TRUE;
     }
 
     void service::render_thread()
     {
-        syslog(LOG_INFO, "Started thread");
+        LECTOR_LOG("Started thread");
         context ctx(ctx_);
-        syslog(LOG_INFO, "Copied");
+        LECTOR_LOG("Copied");
 
         std::tuple<float, int, std::string> elem;
 
         while(running_)
         {
-            syslog(LOG_INFO, "Rendering task");
+            LECTOR_LOG("Rendering task");
             queue_.pop(elem);
 
             float const& zoom = std::get<0>(elem);
             int const& page = std::get<1>(elem);
             std::string const& filename = std::get<2>(elem);
-            syslog(LOG_INFO, "Got item");
+            LECTOR_LOG("Got item");
             try
             {
                 pixmap pix = ctx.render_full(zoom, page);
@@ -84,9 +79,9 @@ namespace lector
             }
             catch (std::runtime_error const& exc)
             {
-                syslog(LOG_ERR, "Exception: %s", exc.what());
+                LECTOR_LOG_ERROR("Exception: %s", exc.what());
             }
-            syslog(LOG_INFO, "Rendered successfully");
+            LECTOR_LOG("Rendered successfully");
 
             std::string response_json =
                 (boost::format(render_response) % page
@@ -94,7 +89,7 @@ namespace lector
 
             const char* response = response_json.c_str();
             PDL_CallJS("RenderCallback", &response, 1);
-            syslog(LOG_INFO, "Done rendering page %d", page);
+            LECTOR_LOG("Done rendering page %d", page);
         }
     }
     

@@ -5,7 +5,6 @@
 #include <memory>
 #include <boost/utility.hpp>
 #include <boost/thread/mutex.hpp>
-#include <syslog.h>
 
 extern "C"
 {
@@ -13,6 +12,7 @@ extern "C"
 #include <mupdf.h>
 }
 
+#include "log.hpp"
 #include "pixmap.hpp"
 
 namespace lector
@@ -32,12 +32,6 @@ namespace lector
         {}
     };
 
-    // TODO: Merge pixmap_renderer, pdf_document and pdf_page into context
-    //       Maybe only merge the first two, pdf_page actually has some use
-    //
-    // TODO: Rename to draw_context, add a text_context
-    // TODO: Share display lists, generate one per page
-    // 
     class context
     {
     public:
@@ -57,7 +51,6 @@ namespace lector
         fz_rect get_bbox(std::size_t page);
         pixmap render_full(float zoom, std::size_t page);
 
-        // TODO: Version with return types (in seperate impl header)
         template <typename Func, typename... Args>
         void call (Func func, Args... args)
         {
@@ -67,7 +60,8 @@ namespace lector
             }
             fz_catch(ctx_)
             {
-                syslog(LOG_INFO, "Fitz exception");
+                // TODO: Get error message from fitz
+                LECTOR_LOG_ERROR("Fitz exception");
                 throw fitz_exception("exception");
             }
         }
@@ -82,8 +76,9 @@ namespace lector
             }
             fz_catch(ctx_)
             {
-                syslog(LOG_INFO, "Fitz exception");
-                throw fitz_exception("");
+                // TODO: Get error message from fitz
+                LECTOR_LOG_ERROR("Fitz exception");
+                throw fitz_exception("exception");
             }
             return result;
         }

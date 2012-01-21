@@ -1,10 +1,9 @@
 #include "service.hpp"
 
+#include "../log.hpp"
 #include "../util/md5_to_string.hpp"
 
 #include <fstream>
-
-#include <syslog.h>
 
 namespace lector
 {
@@ -48,9 +47,9 @@ namespace lector
         {
             std::string filename = PDL_GetJSParamString(params, 1);
 
-            syslog(LOG_INFO, "Loading file");
+            LECTOR_LOG("Loading file");
             ctx_.load_file(filename);
-            syslog(LOG_INFO, "Loaded file");
+            LECTOR_LOG("Loaded file");
 
             if (ctx_.needs_password())
             {
@@ -95,7 +94,7 @@ namespace lector
                     new boost::thread(boost::bind(&service::render_thread, this)
                         ));
 
-        syslog(LOG_INFO, "Started threads");
+        LECTOR_LOG("Started threads");
 
         const char* ptr = r.c_str();
 

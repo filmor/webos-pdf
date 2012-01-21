@@ -1,7 +1,5 @@
 #include "context.hpp"
-
-#include <cstring>
-#include <syslog.h>
+#include "log.hpp"
 
 namespace lector
 {
@@ -12,8 +10,7 @@ namespace lector
         {
             boost::mutex& mutex = *reinterpret_cast<boost::mutex*>(user);
 
-            if (!mutex.try_lock())
-                syslog(LOG_INFO, "Deadlock!");
+            mutex.lock();
         }
 
         void boost_mutex_unlock(void* user)
@@ -68,7 +65,7 @@ namespace lector
         : data_(new shared_data), fitz_mutex_(new boost::mutex),
           data_mutex_(new boost::mutex)
     {
-        syslog(LOG_INFO, "Initialising context");
+        LECTOR_LOG_FUNC;
         boost::mutex::scoped_lock lock(*data_mutex_);
 
         data_->alloc = new fz_alloc_context;
@@ -77,28 +74,24 @@ namespace lector
         data_->alloc->free = fz_alloc_default.free;
         data_->alloc->lock = boost_mutex_lock;
         data_->alloc->unlock = boost_mutex_unlock;
-        syslog(LOG_INFO, "Initialised data");
+        LECTOR_LOG("Initialized data");
 
         data_->alloc->user = reinterpret_cast<void*>(fitz_mutex_.get());
         data_->lists = 0;
 
         ctx_ = fz_new_context(data_->alloc, limit << 20);
-        syslog(LOG_INFO, "Initialised context");
     }
 
     context::context(context const& other)
         : fitz_mutex_(other.fitz_mutex_),
           data_mutex_(other.data_mutex_)
     {
-        syslog(LOG_INFO, "Before \"cloning\" data");
         {
             boost::mutex::scoped_lock lock(*data_mutex_);
             data_ = other.data_;
         }
 
-        syslog(LOG_INFO, "Before cloning context");
         ctx_ = fz_clone_context(const_cast<fz_context*>(other.ctx_));
-        syslog(LOG_INFO, "Cloned context");
     }
    
     context::~context()
@@ -130,7 +123,7 @@ namespace lector
             xref = 0;
             throw pdf_exception("Couldn't open PDF file");
         }
-        syslog(LOG_INFO, "Done loading page");
+        LECTOR_LOG("Done loading xref");
 
         // TODO: This does only work if the file doesn't need a password. Do
         //       this in "authenticate" or an additional private function
@@ -154,29 +147,27 @@ namespace lector
                 }
                 fz_catch(ctx_)
                 {
-                    syslog(LOG_ERR, "Couldn't create list for page %d", i);
+                    LECTOR_LOG_ERROR("Couldn't create list for page %d", i);
                 }
             }
-            syslog(LOG_INFO, "Created display lists");
 
-            syslog(LOG_INFO, "Just before write");
             {
+                LECTOR_LOG_GUARD("Just before write", "Recycled successfully");
                 boost::mutex::scoped_lock lock(*data_mutex_);
 
                 // Atomic write of data_
                 data_->recycle(ctx_);
-                syslog(LOG_INFO, "Recycled successfully");
+                LECTOR_LOG("Recycled successfully");
                 data_->xref = xref;
                 data_->page_count = page_count;
                 data_->lists = lists;
             }
-            syslog(LOG_INFO, "Wrote successfully");
         }
         fz_catch(ctx_)
         {
             pdf_free_xref(xref);
             xref = 0;
-            syslog(LOG_ERR, "Meh, didn't work");
+            LECTOR_LOG_ERROR("Meh, didn't work");
             throw pdf_exception("Couldn't load pages");
         }
     }

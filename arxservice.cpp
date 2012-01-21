@@ -1,8 +1,7 @@
-#include <syslog.h>
-
 #include <PDL.h>
 #include <SDL.h>
 
+#include "log.hpp"
 #include "service/service.hpp"
 
 lector::service* service;
@@ -13,7 +12,7 @@ PDL_bool handler(PDL_JSParameters* params)
     int argc = PDL_GetNumJSParams(params);
 
     std::string type(PDL_GetJSParamString(params, 0));
-    syslog(LOG_INFO, "Handler called with mode %s", type.c_str());
+    LECTOR_LOG("Handler called with mode %s", type.c_str());
 
 #define IF_TYPE(name, n)                                        \
     if (type == #name)                                          \
@@ -54,11 +53,11 @@ PDL_bool handler(PDL_JSParameters* params)
     return return_value;
 }
 
-const char* version_information = "{\"version\":\"mupdf 0.9\"}";
+const char* version_information = "{\"version\":\"mupdf 0.9-e045\"}";
 
 int main()
 {
-    syslog(LOG_INFO, "Starting up");
+    LECTOR_LOG("Starting up");
     SDL_Init(SDL_INIT_VIDEO);
     PDL_Init(0);
 
