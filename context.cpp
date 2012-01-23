@@ -111,11 +111,19 @@ namespace lector
     // TODO: Move this into the constructor
     void context::load_file(std::string const& name)
     {
+        LECTOR_LOG_FUNC;
+
         pdf_xref* xref = 0;
+        std::size_t page_count = 0;
+        fz_display_list** lists = 0;
 
         fz_try(ctx_)
         {
             xref = pdf_open_xref(ctx_, const_cast<char*> (name.c_str()));
+            page_count = pdf_count_pages(xref);
+            lists = new fz_display_list*[page_count];
+            for (unsigned i = 0; i < page_count; ++i)
+                lists[i] = 0;
         }
         fz_catch(ctx_)
         {
@@ -124,64 +132,71 @@ namespace lector
         }
 
         {
-            LECTOR_LOG_GUARD("Rewriting xref", "Done");
             boost::mutex::scoped_lock lock(*data_mutex_);
 
             data_->recycle(ctx_);
             data_->xref = xref;
+            data_->page_count = page_count;
+            data_->lists = lists;
         }
-
-        if (!needs_password())
-            load_display_lists();
     }
 
-    void context::load_display_lists()
+    fz_display_list* context::get_display_list(std::size_t i)
     {
         pdf_xref* xref = data_->xref;
-        if (!xref)
-            return;
+        std::size_t page_count = data_->page_count;
+        if (!xref || page_count < i)
+            throw pdf_exception("ERROR");
 
-        fz_try(ctx_)
+        fz_display_list* list = data_->lists[i];
+
+        if (!list)
         {
-            std::size_t page_count = pdf_count_pages(xref);
+            LECTOR_LOG("Loading list %d of %d", i, page_count);
+            list = call_ret<fz_display_list*> (fz_new_display_list);
 
-            fz_display_list** lists = new fz_display_list*[page_count];
+            fz_context* main_context = xref->ctx;
 
-            // Create display lists
-            for (unsigned i = 0; i < page_count; ++i)
             {
-                lists[i] = fz_new_display_list(ctx_);
+                // Lock here, because xrefs holds a file descriptor
+                boost::mutex::scoped_lock lock(*data_mutex_);
 
+                // Check again after acquiring the lock
+                if (data_->lists[i])
+                    return data_->lists[i];
+
+                xref->ctx = ctx_;
+
+                pdf_page* page = 0;
                 fz_try(ctx_)
                 {
-                    pdf_page* page = pdf_load_page(xref, i);
-                    fz_device* dev = fz_new_list_device(ctx_, lists[i]);
-                    pdf_run_page(xref, page, dev, fz_identity, 0);
-                    fz_free_device(dev);
+                    page = pdf_load_page(xref, i);
                 }
                 fz_catch(ctx_)
                 {
-                    LECTOR_LOG_ERROR("Couldn't create list for page %d", i);
+                    LECTOR_LOG_ERROR("Couldn't load page %d", i);
+                    throw pdf_exception("Couldn't load page");
                 }
-            }
 
-            {
-                LECTOR_LOG_GUARD("Just before write", "Recycled successfully");
-                boost::mutex::scoped_lock lock(*data_mutex_);
+                fz_device* dev = call_ret<fz_device*> (fz_new_list_device, list);
 
-                // Atomic write of data_
-                data_->xref = xref;
-                data_->page_count = page_count;
-                data_->lists = lists;
+                fz_try(ctx_)
+                {
+                    pdf_run_page(xref, page, dev, fz_identity, 0);
+                }
+                fz_catch(ctx_)
+                {
+                    LECTOR_LOG_ERROR("Couldn't run page %d", i);
+                    throw pdf_exception("Couldn't run page");
+                }
+                fz_free_device(dev);
+
+                xref->ctx = main_context;
+                data_->lists[i] = list;
             }
         }
-        fz_catch(ctx_)
-        {
-            pdf_free_xref(xref);
-            xref = 0;
-            LECTOR_LOG_ERROR("Meh, didn't work");
-            throw pdf_exception("Couldn't load pages");
-        }
+
+        return list;
     }
 
     bool context::needs_password() const
@@ -194,13 +209,8 @@ namespace lector
         LECTOR_LOG_FUNC;
         bool result = false;
         if (data_->xref && needs_password())
-        {
             result = pdf_authenticate_password(data_->xref,
                                                const_cast<char*> (password.c_str()));
-            if (result)
-                load_display_lists();
-            LECTOR_LOG("Result: %s", result ? "True": "False");
-        }
         return result;
     }
 
@@ -228,6 +238,7 @@ namespace lector
     pixmap context::render_full(float zoom, std::size_t n)
     {
         pdf_page* page = pdf_load_page(data_->xref, n);
+        fz_display_list* list = get_display_list(n);
         fz_rect bounds = pdf_bound_page(data_->xref, page);
 
         fz_matrix ctm = fz_scale(zoom, zoom);
@@ -239,7 +250,7 @@ namespace lector
         pix.clear(255);
 
         fz_device* dev = call_ret<fz_device*>(fz_new_draw_device, pix.get());
-        fz_execute_display_list(data_->lists[n], dev, ctm, bbox, 0);
+        fz_execute_display_list(list, dev, ctm, bbox, 0);
         fz_free_device(dev);
 
         call(pdf_free_page, page);

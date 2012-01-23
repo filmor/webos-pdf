@@ -84,7 +84,7 @@ namespace lector
         }
 
     private:
-        void load_display_lists();
+        fz_display_list* get_display_list(std::size_t);
 
         struct shared_data;
 
