@@ -15,6 +15,8 @@ extern "C"
 #include "log.hpp"
 #include "pixmap.hpp"
 
+#pragma GCC diagnostic ignored "-Wuninitialized"
+
 namespace lector
 {
 
