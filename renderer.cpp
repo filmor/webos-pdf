@@ -2,6 +2,7 @@
 #include "gles/exception.hpp"
 
 #include <iostream>
+#include <functional>
 #include <GLES2/gl2.h>
 
 namespace lector
@@ -34,10 +35,9 @@ namespace lector
 ";
     }
 
-    renderer::renderer(fz_context* ctx, 
-                       pdf_document& doc, std::size_t width, std::size_t height)
-        : doc_(doc)
-        , renderer_(ctx)
+    renderer::renderer(context& ctx, std::size_t width, std::size_t height)
+        : ctx_(ctx)
+        , manager_(ctx)
     {
         glClearColor(0.0, 0.0, 0.0, 1.0);
         resize(width, height);
@@ -48,7 +48,6 @@ namespace lector
         program_.use();
         
         // Generate textures and buffer objects
-        // prepare_cache(3);
         glGenBuffers(2, vbos_);
 
         glUniform1i(program_.get_uniform_location("texture"), 0);
@@ -97,7 +96,75 @@ namespace lector
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(element_array),
                      element_array, GL_STATIC_DRAW);
 
-        switch_to_page(0);
+        // Callback that gets called whenever a new tile is ready. If the tile
+        // has been rejected, return false
+        manager_.register_callback(std::bind(&renderer::tile_callback, this));
+    }
+
+    bool renderer::tile_callback(std::size_t page, std::size_t x, std::size_t y,
+                                 int level, bool page_complete, pixmap const& pix)
+    {
+        // BUG!
+        //
+        // The tile callback should only add (most of its parameters but
+        // especially the pixmap reference) to the queue, so that it's blitted in
+        // the rendering loop. The gl functions /have/ to be called inside of
+        // the main thread, otherwise hell breaks loose.
+        //
+        // Heap structure:
+        // The first item in the texture is the whole page on zoom level 0, next
+        // are (0,0), (0,1), (1,0), (1,1) on level 1 and (0,0), (0,1), (0,2),
+        // (0,3), (1,0), (1,1), … on level 2 so the formula is
+        //
+        //   \sum_{i=0}^{level} 4^i + 2^{level} * x + y
+        //       = (1 - 4^{level - 1}) / (1 - 4) + 2^{level} * x + y
+        //
+        const int index = (1 << 2 * (level - 1)) / 3
+                           + (1 << level) * x
+                           + y;
+
+        const unsigned TILE_SIZE = 256;
+
+        if (handles_[page][level] == -1)
+        {
+            const std::size_t size = TILE_SIZE * (1 << level);
+            glGenTextures(1, &handles_[page][level]);
+
+            glBindTexture(GL_TEXTURE_2D, handles_[page][level]);
+
+            // This has to be done before rendering, it doesn't concern the
+            // loading of the texture!
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+            // Generate empty texture
+            glTexImage2D(GL_TEXTURE_2D,
+                         0,
+                         GL_RGBA,
+                         size,
+                         size,
+                         0,
+                         GL_RGBA,
+                         GL_UNSIGNED_BYTE,
+                         0
+                    );
+        }
+
+
+        // TODO: Skip second bind
+        // Blit pixmap into texture
+        glBindTexture(GL_TEXTURE_2D, handles_[page][level]);
+        glTexSubImage2D(GL_TEXTURE_2D,
+                        0,
+                        x * 256,
+                        y * 256,
+                        pix.width(),
+                        pix.height(),
+                        GL_RGBA,
+                        GL_UNSIGNED_BYTE, // One byte per component 
+                        pix.get_data()
+                        );
+
     }
 
     void renderer::resize(std::size_t width, std::size_t height)
@@ -105,56 +172,19 @@ namespace lector
         glViewport(0, 0, width, height);
     }
 
-#if 0
-    void renderer::cache(std::size_t n, std::size_t radius)
-    {
-        std::size_t const start = n > radius ? n - radius : 0;
-        std::size_t const end = n + radius < doc_.pages() ? n + radius : doc_.pages();
-
-        prepare_cache(end - start);
-
-        // TODO: Catch existing textures
-        for (unsigned i = start; i < n; ++i)
-            cache(i);
-    }
-
-    void renderer::prepare_cache(std::size_t n)
-    {
-        // TODO: Cache format: circular_buffer<pair<page, texturehandle>>
-        if (cache_.size() >= n)
-            return;
-
-        if (cache_.size() != 0)
-            glDeleteTextures(cache_.size(), &cache_[0]);
-        
-        cache_.resize(n);
-        
-        glGenTextures(cache_.size(), &cache_[0]);
-        map_.clear();
-    }
-#endif
-
-    void renderer::render_texture(std::size_t n)
-    {
-        std::cout << "Caching page " << n << "\n";
-        pdf_page_ptr page = doc_.get_page(n);
-        const float zoom_factor = 2.;
-        // TODO: handle zoom_factor in texture_manager
-        pixmap pix = renderer_.render_full(zoom_factor, page);
-
-        manager_.upload(pix.width(), pix.height(), pix.get_data());
-
-        gles::get_error();
-    }
-
     renderer::~renderer()
     {
         glDeleteBuffers(2, vbos_);
     }
 
-    void renderer::draw_frame()
+    void renderer::render_page(std::size_t page, std::size_t x, std::size_t y,
+                               float zoom_level)
     {
-        manager_.bind();
+        // Which part of the page is seen at this zoom-level
+
+        // Ask the tile manager to prepare those tiles
+        manager_.generate();
+
         glClear(GL_COLOR_BUFFER_BIT);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, vbos_[1]);
         glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);

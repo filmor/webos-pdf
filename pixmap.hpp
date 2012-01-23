@@ -46,7 +46,7 @@ namespace lector
                          0);
         }
 
-        void* get_data() { return pix_->samples; }
+        const void* get_data() const { return pix_->samples; }
 
         // TODO: This should go away!
         fz_pixmap* get() { return pix_; }

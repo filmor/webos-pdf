@@ -6,7 +6,7 @@
 #include <PDL.h>
 #include <GLES2/gl2.h>
 
-#include "pdf_document.hpp"
+#include "context.hpp"
 #include "renderer.hpp"
 #include "event_transform.hpp"
 #include "scene.hpp"
@@ -21,14 +21,15 @@ int main (int argc, char** argv)
 
     std::string filename = argv[1];
 
-    fz_context* ctx = fz_new_context(&fz_alloc_default, 512 << 20);
-    pdf_document* doc;
+    fz_accelerate();
+
+    context ctx;
 
     try
     {
-        doc = new pdf_document(ctx, argv[1]);
+        ctx.load_file(argv[1]);
     }
-    catch (pdf_exception const& exc)
+    catch (std::runtime_error const& exc)
     {
         std::cerr << "Exception: " << exc.what();
         return 1;
@@ -43,7 +44,7 @@ int main (int argc, char** argv)
         SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 2);
         SDL_Surface* screen = SDL_SetVideoMode(0, 0, 0, SDL_OPENGL);
 
-        lector::renderer renderer(ctx, *doc, screen->w, screen->h);
+        lector::renderer renderer(ctx, screen->w, screen->h);
 
         lector::scene scene(renderer);
         lector::event_transform handler(scene);
@@ -115,7 +116,6 @@ int main (int argc, char** argv)
         throw;
     }
 
-    delete doc;
     PDL_Quit();
     SDL_Quit();
 }

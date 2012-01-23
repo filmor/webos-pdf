@@ -2,11 +2,9 @@
 #define LECTOR_RENDERER_HPP
 
 #include <vector>
-#include <boost/circular_buffer.hpp>
 
-#include "pdf_document.hpp"
-#include "pixmap_renderer.hpp"
-#include "texture_manager.hpp"
+#include "context.hpp"
+#include "tile_manager.hpp"
 #include "gles/program.hpp"
 
 namespace lector
@@ -15,36 +13,53 @@ namespace lector
     class renderer
     {
     public:
-        renderer(fz_context*, pdf_document&, std::size_t width, std::size_t height);
+        renderer(context& ctx, std::size_t width, std::size_t height);
         ~renderer();
 
         void draw_frame();
 
-        // Cache (read: render texture) of the pages [n-radius, n+radius]
-        void cache(std::size_t n, std::size_t radius) {}
-
-        void render_texture(std::size_t n);
+        void cache(std::size_t n, std::size_t radius);
 
         void resize (std::size_t, std::size_t);
+
+        void render_page(std::size_t page,
+                         std::size_t x, std::size_t y,
+                         float zoom_level);
 
         void switch_to_page(std::size_t n)
         {
             render_texture(n);
         }
 
-        std::size_t page_count() const
+        std::size_t get_page_count() const
         {
-            return doc_.pages();
+            return ctx_.get_page_count();
         }
 
     private:
-        pdf_document& doc_;
-        pixmap_renderer renderer_;
+        void render_texture(std::size_t n);
+
+        bool tile_callback(std::size_t page, std::size_t x, std::size_t y,
+                             int level, bool page_complete, pixmap const& pix);
+
+        context& ctx_;
+
+        // Shader and Vertex Buffer objects
         gles::program program_;
-        std::vector<float> vertex_array_;
-        std::vector<float> texcoord_array_;
-        texture_manager manager_;
         GLuint vbos_[2];
+        GLuint** handles_;
+
+        // Dimensions of the screen to determine which tiles can actually be
+        // seen
+        std::pair<std::size_t, std::size_t> dimensions_;
+
+        // Array of vertices, since we only draw quads atm this is trivial
+        std::vector<float> vertex_array_;
+        // Array of texture coordinates
+        std::vector<float> texcoord_array_;
+
+        // Manager
+        tile_manager manager_;
     };
 
 }

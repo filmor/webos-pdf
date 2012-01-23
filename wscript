@@ -65,13 +65,13 @@ def build(bld):
             )
 
     programs = {
-                 "arxservice" :
-                    (add_cpp("arxservice", "util/filesystem",
-                             "service/find", "service/open", "service/saveas",
-                             "service/render", "service/service"), []),
-#                 "lector" : 
-#                    (add_cpp("main", "renderer", "scene", "gles/program",
-#                             "texture_manager"), ["GL"])
+#                 "arxservice" :
+#                    (add_cpp("arxservice", "util/filesystem",
+#                             "service/find", "service/open", "service/saveas",
+#                             "service/render", "service/service"), []),
+                 "lector" : 
+                    (add_cpp("main", "renderer", "scene", "gles/program",
+                             "tile_manager"), ["GL"])
                }
 
     for prog, t in programs.items():
